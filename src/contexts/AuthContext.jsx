@@ -59,6 +59,20 @@ export function AuthProvider({ children }) {
     })
   }
 
+  async function signUpWithPassword(email, password, fullName) {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: fullName } },
+    })
+    return { error }
+  }
+
+  async function signInWithPassword(email, password) {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    return { error }
+  }
+
   async function signOut() {
     await supabase.auth.signOut()
   }
@@ -70,6 +84,8 @@ export function AuthProvider({ children }) {
     profileLoading,
     loading: session === undefined || (!!session && profileLoading),
     signInWithGoogle,
+    signUpWithPassword,
+    signInWithPassword,
     signOut,
     refreshProfile,
   }
