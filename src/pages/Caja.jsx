@@ -47,7 +47,9 @@ export default function Caja() {
   }, [user, cursor])
 
   const totalFacturado = classes.reduce((s, c) => s + Number(c.price || 0), 0)
+  const totalComision = classes.reduce((s, c) => s + Number(c.commission || 0), 0)
   const totalGastos = expenses.reduce((s, e) => s + Number(e.amount || 0), 0)
+  const totalNeto = totalFacturado - totalComision - totalGastos
 
   const debtByStudent = useMemo(() => {
     const map = {}
@@ -75,7 +77,7 @@ export default function Caja() {
   const isCurrentMonth = monthLabel(cursor) === monthLabel(new Date())
 
   return (
-    <div className="max-w-lg mx-auto px-5 py-6 fade-in">
+    <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 fade-in">
       <Header backTo="/panel" backLabel="Panel" />
 
       <div className="flex items-center justify-between mb-4">
@@ -90,7 +92,17 @@ export default function Caja() {
         <div className="text-xs text-slate-500 mt-1">
           {isCurrentMonth ? 'Clases cargadas este mes' : `Clases de ${monthLabel(cursor)}`}
         </div>
-        <Link to="/configuracion/tarifas" className="btn-secondary inline-block mt-3">Editar tarifa predeterminada</Link>
+        {totalComision > 0 && (
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-bg-border text-sm">
+            <span className="text-slate-400">Comisión al club</span>
+            <span className="font-semibold text-amber-400">− {formatMoney(totalComision, profile?.currency)}</span>
+          </div>
+        )}
+        <div className="flex items-center justify-between mt-1.5 text-sm">
+          <span className="text-slate-400">Te queda neto</span>
+          <span className="font-bold text-brand">{loading ? '–' : formatMoney(totalNeto, profile?.currency)}</span>
+        </div>
+        <Link to="/configuracion/tarifas" className="btn-secondary inline-block mt-3">Editar tarifas y comisión</Link>
       </div>
 
       <div className="grid grid-cols-2 gap-2.5 mb-2.5">

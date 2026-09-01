@@ -38,7 +38,7 @@ export default function SettingsHome() {
     : 30
 
   return (
-    <div className="max-w-lg mx-auto px-5 py-6 pb-16 fade-in">
+    <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 pb-16 fade-in">
       <Header backTo="/" backLabel="Inicio" />
       <h1 className="text-xl font-extrabold mb-4">Configuración</h1>
 

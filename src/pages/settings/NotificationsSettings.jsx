@@ -46,7 +46,7 @@ export default function NotificationsSettings() {
   }
 
   return (
-    <div className="max-w-lg mx-auto px-5 py-6 fade-in">
+    <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 fade-in">
       <Header backTo="/configuracion" backLabel="Configuración" />
       <h1 className="text-xl font-extrabold mb-0.5">Notificaciones</h1>
       <p className="text-slate-400 text-sm mb-5">Elegí qué te queremos avisar sin que tengas que abrir la app.</p>

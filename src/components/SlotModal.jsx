@@ -43,16 +43,20 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
 
   const filtered = students.filter((s) => s.name.toLowerCase().includes(query.toLowerCase()))
   const priceFor = (size) => (rates ? { individual: rates.individual_price, duo: rates.duo_price, trio: rates.trio_price, grupo4: rates.group4_price }[size] : 0)
+  const commissionFor = (size) =>
+    (rates ? { individual: rates.individual_commission, duo: rates.duo_commission, trio: rates.trio_commission, grupo4: rates.group4_commission }[size] : 0) || 0
 
   async function assignExisting(student) {
     setSaving(true)
+    const size = student.group_size || 'individual'
     await supabase.from('classes').insert({
       profesor_id: user.id,
       student_id: student.id,
       class_date: slot.iso,
       start_time: slot.time,
       status: 'scheduled',
-      price: student.price_override ?? priceFor(student.group_size || 'individual'),
+      price: student.price_override ?? priceFor(size),
+      commission: commissionFor(size),
     })
     setSaving(false)
     onSaved()
@@ -86,6 +90,7 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
         start_time: slot.time,
         status: 'scheduled',
         price: priceFor(groupSize),
+        commission: commissionFor(groupSize),
       })
     }
     setSaving(false)

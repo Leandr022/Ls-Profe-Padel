@@ -68,7 +68,7 @@ export default function Home() {
   const todayLabel = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
 
   return (
-    <div className="max-w-lg mx-auto px-5 py-6 fade-in">
+    <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 fade-in">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-1.5 font-extrabold text-lg">
           <img src="/logo.png" alt="" className="w-6 h-6 rounded-full object-cover" />

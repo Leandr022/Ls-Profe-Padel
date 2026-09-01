@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { DAY_NAMES_FULL, groupSizeLabel, GENDERS, categoryLabel } from '../lib/helpers'
 import Header from '../components/Header'
 import StudentFormModal from '../components/StudentFormModal'
+import ImportStudentsModal from '../components/ImportStudentsModal'
 import { PlusIcon, UsersIcon } from '../components/Icons'
 
 export default function Students() {
@@ -16,6 +17,7 @@ export default function Students() {
   const [dayFilter, setDayFilter] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [modalStudent, setModalStudent] = useState(undefined) // undefined = closed, null = new
+  const [showImport, setShowImport] = useState(false)
 
   async function load() {
     if (!user) return
@@ -31,9 +33,12 @@ export default function Students() {
 
   const categories = useMemo(() => [...new Set(students.map((s) => s.category).filter(Boolean))], [students])
   const coolingCount = students.filter((s) => s.status === 'cooling').length
+  const bajaCount = students.filter((s) => s.status === 'baja').length
 
   const filtered = students.filter((s) => {
+    if (tab === 'todos' && s.status === 'baja') return false
     if (tab === 'enfriando' && s.status !== 'cooling') return false
+    if (tab === 'baja' && s.status !== 'baja') return false
     if (query && !s.name.toLowerCase().includes(query.toLowerCase())) return false
     if (genderFilter && s.gender !== genderFilter) return false
     if (dayFilter !== '' && String(s.day_of_week) !== dayFilter) return false
@@ -42,21 +47,31 @@ export default function Students() {
   })
 
   return (
-    <div className="max-w-lg mx-auto px-5 py-6 pb-24 fade-in">
+    <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 pb-24 fade-in">
       <Header backTo="/panel" backLabel="Panel" />
       <div className="text-sm text-slate-400 mb-2">{students.length} alumnos</div>
 
       <input className="input mb-3" placeholder="Buscar alumno..." value={query} onChange={(e) => setQuery(e.target.value)} />
 
-      <button onClick={() => setModalStudent(null)} className="w-full rounded-full bg-brand/10 border border-brand/30 text-brand font-semibold py-2.5 mb-3">
-        + Agregar alumno
-      </button>
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <button onClick={() => setModalStudent(null)} className="rounded-full bg-brand/10 border border-brand/30 text-brand font-semibold py-2.5">
+          + Agregar alumno
+        </button>
+        <button onClick={() => setShowImport(true)} className="btn-secondary">
+          Importar desde Excel
+        </button>
+      </div>
 
-      <div className="flex gap-2 mb-3">
+      <div className="flex gap-2 mb-3 flex-wrap">
         <button onClick={() => setTab('todos')} className={`pill ${tab === 'todos' ? 'bg-brand text-slate-900 font-bold' : 'card text-slate-300'}`}>Todos</button>
         <button onClick={() => setTab('enfriando')} className={`pill ${tab === 'enfriando' ? 'bg-brand text-slate-900 font-bold' : 'card text-slate-300'}`}>
           Enfriándose {coolingCount}
         </button>
+        {bajaCount > 0 && (
+          <button onClick={() => setTab('baja')} className={`pill ${tab === 'baja' ? 'bg-brand text-slate-900 font-bold' : 'card text-slate-300'}`}>
+            Bajas {bajaCount}
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-2 mb-2">
@@ -88,7 +103,7 @@ export default function Students() {
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-2 md:grid md:grid-cols-2 md:gap-2 md:space-y-0 lg:grid-cols-3">
         {filtered.map((s) => (
           <button key={s.id} onClick={() => setModalStudent(s)} className="w-full card p-3.5 flex items-center gap-3 text-left hover:border-brand/40">
             <div className="w-10 h-10 rounded-full bg-brand/20 text-brand flex items-center justify-center font-bold shrink-0">
@@ -105,6 +120,9 @@ export default function Students() {
             </div>
             {s.status === 'cooling' && (
               <span className="text-[10px] font-bold uppercase bg-amber-500/20 text-amber-400 px-2 py-1 rounded-full shrink-0">Enfriándose</span>
+            )}
+            {s.status === 'baja' && (
+              <span className="text-[10px] font-bold uppercase bg-red-500/20 text-red-400 px-2 py-1 rounded-full shrink-0">Baja</span>
             )}
           </button>
         ))}
@@ -127,6 +145,8 @@ export default function Students() {
           }}
         />
       )}
+
+      {showImport && <ImportStudentsModal onClose={() => setShowImport(false)} onImported={load} />}
     </div>
   )
 }

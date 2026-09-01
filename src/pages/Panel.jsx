@@ -11,12 +11,12 @@ const items = [
 
 export default function Panel() {
   return (
-    <div className="max-w-lg mx-auto px-5 py-6 fade-in">
+    <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 fade-in">
       <Header backTo="/" backLabel="Inicio" />
       <h1 className="text-xl font-extrabold mb-0.5">Panel Profe</h1>
       <p className="text-slate-400 text-sm mb-6">Tu espacio de trabajo</p>
 
-      <div className="space-y-3">
+      <div className="space-y-3 sm:grid sm:grid-cols-2 sm:gap-3 sm:space-y-0">
         {items.map(({ to, title, desc, Icon }) => (
           <Link key={to} to={to} className="card flex items-center gap-3 p-4 hover:border-brand/40 transition">
             <Icon className="text-slate-400" size={22} />

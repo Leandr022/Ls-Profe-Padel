@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { DAY_NAMES, DAY_NAMES_FULL, timeSlots } from '../../lib/helpers'
 import Header from '../../components/Header'
-import { ChevronRight, PlusIcon, CloseIcon } from '../../components/Icons'
+import { ChevronRight, PlusIcon, CloseIcon, CheckCircleIcon } from '../../components/Icons'
 
 export default function ScheduleSettings() {
   const { user } = useAuth()
@@ -61,23 +61,34 @@ export default function ScheduleSettings() {
   }
 
   return (
-    <div className="max-w-lg mx-auto px-5 py-6 pb-10 fade-in">
+    <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 pb-10 fade-in">
       <Header backTo="/configuracion" backLabel="Configuración" />
       <h1 className="text-xl font-extrabold mb-0.5">Mis horarios</h1>
       <p className="text-slate-400 text-sm mb-5">Tu semana laboral, configurada una sola vez</p>
 
       <div className="card p-4 mb-3">
         <div className="label-muted mb-3">Días de clases</div>
+        <p className="text-xs text-slate-500 mb-3">Tocá un día para activarlo o desactivarlo.</p>
         <div className="grid grid-cols-4 gap-2">
-          {DAY_NAMES.concat('Dom').map((d, i) => (
-            <button
-              key={i}
-              onClick={() => toggleDay(i)}
-              className={`py-2.5 rounded-full text-sm font-semibold transition ${workingDays[i] ? 'bg-white text-slate-900' : 'bg-bg-card text-slate-500 border border-bg-border'}`}
-            >
-              {d}
-            </button>
-          ))}
+          {DAY_NAMES.concat('Dom').map((d, i) => {
+            const active = !!workingDays[i]
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => toggleDay(i)}
+                aria-pressed={active}
+                className={`relative py-2.5 rounded-full text-sm font-semibold transition active:scale-95 ${
+                  active
+                    ? 'bg-brand text-slate-900 shadow-md shadow-brand/30 ring-2 ring-brand'
+                    : 'bg-bg-card text-slate-500 border border-bg-border hover:border-brand/40'
+                }`}
+              >
+                {active && <CheckCircleIcon size={13} className="absolute -top-1.5 -right-1.5 bg-bg-panel rounded-full text-brand" />}
+                {d}
+              </button>
+            )
+          })}
         </div>
       </div>
 

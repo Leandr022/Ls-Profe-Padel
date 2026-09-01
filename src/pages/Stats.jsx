@@ -1,15 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { formatMoney, toISODate } from '../lib/helpers'
+import { formatMoney, monthLabel, toISODate } from '../lib/helpers'
 import Header from '../components/Header'
-import { CashIcon, ChartIcon, UsersIcon, WarningIcon, ChevronRight } from '../components/Icons'
+import { CashIcon, ChartIcon, UsersIcon, WarningIcon, ChevronDown, TrophyIcon, CheckCircleIcon } from '../components/Icons'
 
 async function monthTotals(userId, monthStart, monthEnd) {
-  const [{ data: classes }, { data: expenses } ] = await Promise.all([
+  const [{ data: classes }, { data: expenses }] = await Promise.all([
     supabase
       .from('classes')
-      .select('price, paid, student_id, status')
+      .select('price, commission, paid, student_id, status, students(name)')
       .eq('profesor_id', userId)
       .gte('class_date', toISODate(monthStart))
       .lte('class_date', toISODate(monthEnd))
@@ -18,35 +18,63 @@ async function monthTotals(userId, monthStart, monthEnd) {
     supabase.from('expenses').select('amount').eq('profesor_id', userId).gte('expense_date', toISODate(monthStart)).lte('expense_date', toISODate(monthEnd)),
   ])
   const facturado = (classes || []).reduce((s, c) => s + Number(c.price || 0), 0)
+  const comisionClub = (classes || []).reduce((s, c) => s + Number(c.commission || 0), 0)
   const pendiente = (classes || []).filter((c) => !c.paid).reduce((s, c) => s + Number(c.price || 0), 0)
   const gastos = (expenses || []).reduce((s, e) => s + Number(e.amount || 0), 0)
-  const done = (classes || []).filter((c) => c.status !== 'absent').length
-  const students = new Set((classes || []).map((c) => c.student_id)).size
-  return { facturado, pendiente, gastos, ganancia: facturado - gastos, clases: done, students }
+  const done = (classes || []).filter((c) => c.status !== 'absent')
+  const students = new Set(done.map((c) => c.student_id)).size
+
+  const countByStudent = new Map()
+  done.forEach((c) => {
+    const key = c.student_id
+    const entry = countByStudent.get(key) || { name: c.students?.name || 'Alumno', count: 0 }
+    entry.count += 1
+    countByStudent.set(key, entry)
+  })
+  const top = [...countByStudent.values()].sort((a, b) => b.count - a.count).slice(0, 3)
+
+  return { facturado, comisionClub, pendiente, gastos, ganancia: facturado - comisionClub - gastos, clases: done.length, students, top }
+}
+
+function monthRange(date) {
+  const start = new Date(date.getFullYear(), date.getMonth(), 1)
+  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0)
+  return [start, end]
 }
 
 export default function Stats() {
   const { user, profile } = useAuth()
   const [current, setCurrent] = useState(null)
-  const [previous, setPrevious] = useState(null)
+  const [compareMonth, setCompareMonth] = useState(() => {
+    const now = new Date()
+    return new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  })
+  const [compareTotals, setCompareTotals] = useState(null)
   const [attention, setAttention] = useState({ cooling: [], debtors: [] })
   const [showAttention, setShowAttention] = useState(false)
+  const [showTop, setShowTop] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  const now = new Date()
+  const monthOptions = useMemo(() => {
+    const opts = []
+    for (let i = 1; i <= 12; i++) {
+      opts.push(new Date(now.getFullYear(), now.getMonth() - i, 1))
+    }
+    return opts
+  }, [])
 
   useEffect(() => {
     if (!user) return
     let cancelled = false
     async function load() {
       setLoading(true)
-      const now = new Date()
-      const curStart = new Date(now.getFullYear(), now.getMonth(), 1)
-      const curEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-      const prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-      const prevEnd = new Date(now.getFullYear(), now.getMonth(), 0)
+      const [curStart, curEnd] = monthRange(now)
+      const [cmpStart, cmpEnd] = monthRange(compareMonth)
 
-      const [cur, prev, { data: cooling }, { data: debtClasses }] = await Promise.all([
+      const [cur, cmp, { data: cooling }, { data: debtClasses }] = await Promise.all([
         monthTotals(user.id, curStart, curEnd),
-        monthTotals(user.id, prevStart, prevEnd),
+        monthTotals(user.id, cmpStart, cmpEnd),
         supabase.from('students').select('id, name').eq('profesor_id', user.id).eq('status', 'cooling'),
         supabase
           .from('classes')
@@ -59,7 +87,7 @@ export default function Stats() {
       if (cancelled) return
       const debtorNames = [...new Map((debtClasses || []).map((c) => [c.student_id, c.students?.name])).values()]
       setCurrent(cur)
-      setPrevious(prev)
+      setCompareTotals(cmp)
       setAttention({ cooling: cooling || [], debtors: debtorNames })
       setLoading(false)
     }
@@ -67,24 +95,47 @@ export default function Stats() {
     return () => {
       cancelled = true
     }
-  }, [user])
+  }, [user, compareMonth])
 
-  const diff = current && previous ? current.ganancia - previous.ganancia : 0
+  const diff = current && compareTotals ? current.ganancia - compareTotals.ganancia : 0
   const diffLabel = loading
     ? ''
     : diff === 0
-      ? '= igual que el mes pasado a esta altura'
+      ? `= igual que ${monthLabel(compareMonth).toLowerCase()} a esta altura`
       : diff > 0
-        ? `▲ ${formatMoney(diff, profile?.currency)} más que el mes pasado`
-        : `▼ ${formatMoney(Math.abs(diff), profile?.currency)} menos que el mes pasado`
+        ? `▲ ${formatMoney(diff, profile?.currency)} más que ${monthLabel(compareMonth).toLowerCase()}`
+        : `▼ ${formatMoney(Math.abs(diff), profile?.currency)} menos que ${monthLabel(compareMonth).toLowerCase()}`
 
   const attentionCount = attention.cooling.length + attention.debtors.length
 
   return (
-    <div className="max-w-lg mx-auto px-5 py-6 fade-in">
+    <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 fade-in">
       <Header backTo="/panel" backLabel="Panel" />
       <h1 className="text-xl font-extrabold mb-0.5">Estadísticas</h1>
       <p className="text-slate-400 text-sm mb-5">Cómo viene el mes, comparado con el que elijas</p>
+
+      <div className="card p-4 mb-4 bg-brand/10 border-brand/30 flex items-start gap-3">
+        <span className="w-8 h-8 rounded-lg bg-brand/20 text-brand flex items-center justify-center shrink-0 mt-0.5">
+          <CheckCircleIcon size={18} />
+        </span>
+        <div>
+          <div className="font-bold text-brand text-sm">Tu resumen de {monthLabel(now).split(' ')[0]} ya está listo</div>
+          <div className="text-xs text-slate-400 mt-0.5">Facturación, alumnos nuevos, gastos — todo junto, para ver de un vistazo cómo te fue.</div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-sm text-slate-400">Comparar con</span>
+        <select
+          className="input w-auto"
+          value={toISODate(compareMonth)}
+          onChange={(e) => setCompareMonth(new Date(e.target.value + 'T12:00:00'))}
+        >
+          {monthOptions.map((m) => (
+            <option key={toISODate(m)} value={toISODate(m)}>{monthLabel(m)}</option>
+          ))}
+        </select>
+      </div>
 
       <div className="card p-5 mb-3 bg-gradient-to-br from-brand/10 to-transparent border-brand/20">
         <div className="w-8 h-1 rounded-full bg-brand mb-3" />
@@ -95,14 +146,18 @@ export default function Stats() {
 
       <div className="card divide-y divide-bg-border mb-4">
         <Row icon={<CashIcon />} label="Facturado" value={loading ? '–' : formatMoney(current?.facturado, profile?.currency)} />
+        {current?.comisionClub > 0 && (
+          <Row icon={<CashIcon />} label="Comisión al club" value={loading ? '–' : `− ${formatMoney(current?.comisionClub, profile?.currency)}`} />
+        )}
         <Row icon={<CashIcon />} label="Pendiente" value={loading ? '–' : formatMoney(current?.pendiente, profile?.currency)} />
         <Row icon={<UsersIcon />} label="Neto x alumno" value={loading ? '–' : formatMoney(current?.students ? current.ganancia / current.students : 0, profile?.currency)} />
         <Row icon={<ChartIcon />} label="Clases dadas" value={loading ? '–' : current?.clases} />
+
         <button onClick={() => setShowAttention((v) => !v)} className="w-full flex items-center gap-3 px-4 py-3.5 text-left">
           <span className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center"><WarningIcon size={16} /></span>
           <span className="flex-1 font-semibold">Atención</span>
           {attentionCount > 0 && <span className="text-xs font-bold bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">{attentionCount}</span>}
-          <ChevronRight className={`text-slate-500 transition ${showAttention ? 'rotate-90' : ''}`} />
+          <ChevronDown className={`text-slate-500 transition ${showAttention ? 'rotate-180' : ''}`} />
         </button>
         {showAttention && (
           <div className="px-4 pb-4 space-y-2">
@@ -115,6 +170,32 @@ export default function Stats() {
             {attention.cooling.map((s) => (
               <div key={s.id} className="text-sm flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> {s.name} se está enfriando
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button onClick={() => setShowTop((v) => !v)} className="w-full flex items-center gap-3 px-4 py-3.5 text-left">
+          <span className="w-8 h-8 rounded-lg bg-violet-500/15 text-violet-400 flex items-center justify-center"><TrophyIcon size={16} /></span>
+          <span className="flex-1">
+            <span className="font-semibold block">Top asistencia</span>
+            <span className="text-xs text-slate-500">{monthLabel(compareMonth)}</span>
+          </span>
+          <ChevronDown className={`text-slate-500 transition ${showTop ? 'rotate-180' : ''}`} />
+        </button>
+        {showTop && (
+          <div className="px-4 pb-4 space-y-2">
+            {loading && <div className="text-sm text-slate-500">Cargando...</div>}
+            {!loading && (compareTotals?.top || []).length === 0 && (
+              <div className="text-sm text-slate-500">Sin clases registradas ese mes.</div>
+            )}
+            {!loading && (compareTotals?.top || []).map((s, i) => (
+              <div key={s.name + i} className="text-sm flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-violet-500/15 text-violet-400 text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+                  {s.name}
+                </span>
+                <span className="text-slate-400">{s.count} clase{s.count !== 1 ? 's' : ''}</span>
               </div>
             ))}
           </div>

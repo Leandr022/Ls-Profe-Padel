@@ -10,6 +10,7 @@ export const LEVEL_MODS = [
   { key: '+', label: 'Alta +' },
   { key: '-', label: 'Baja -' },
 ]
+export const PERIODS = ['Mañana', 'Tarde', 'Noche']
 
 export function categoryLabel(category, level) {
   if (!category) return ''

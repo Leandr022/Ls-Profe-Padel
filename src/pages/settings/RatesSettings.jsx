@@ -4,79 +4,160 @@ import { supabase } from '../../lib/supabase'
 import { CURRENCIES } from '../../lib/helpers'
 import Header from '../../components/Header'
 
+const ROWS = [
+  { key: 'individual', label: 'Individual' },
+  { key: 'duo', label: 'Dúo (c/u)' },
+  { key: 'trio', label: 'Trío (c/u)' },
+  { key: 'group4', label: 'Grupo de 4 (c/u)' },
+]
+const ALL_FIELDS = ['individual_price', 'duo_price', 'trio_price', 'group4_price', 'monthly_price', 'individual_commission', 'duo_commission', 'trio_commission', 'group4_commission', 'monthly_commission']
+const EMPTY_PRICES = Object.fromEntries(ALL_FIELDS.map((f) => [f, 0]))
+
 export default function RatesSettings() {
   const { user, refreshProfile } = useAuth()
-  const [rates, setRates] = useState(null)
+  const [currency, setCurrency] = useState(null)
+  const [pricesByCurrency, setPricesByCurrency] = useState({})
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
 
   useEffect(() => {
     if (!user) return
-    supabase.from('rates').select('*').eq('profesor_id', user.id).maybeSingle().then(({ data }) => setRates(data))
+    supabase
+      .from('rates')
+      .select('*')
+      .eq('profesor_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) return
+        setCurrency(data.currency)
+        const currentPrices = {}
+        ALL_FIELDS.forEach((f) => (currentPrices[f] = data[f] ?? 0))
+        setPricesByCurrency({
+          ...(data.prices_by_currency || {}),
+          [data.currency]: currentPrices,
+        })
+      })
   }, [user])
 
   function update(field, value) {
-    setRates((r) => ({ ...r, [field]: value }))
+    setPricesByCurrency((p) => ({
+      ...p,
+      [currency]: { ...(p[currency] || EMPTY_PRICES), [field]: value },
+    }))
+    setDirty(true)
+  }
+
+  function switchCurrency(c) {
+    setCurrency(c)
     setDirty(true)
   }
 
   async function save() {
     setSaving(true)
-    await supabase.from('rates').update({
-      currency: rates.currency,
-      individual_price: Number(rates.individual_price) || 0,
-      duo_price: Number(rates.duo_price) || 0,
-      trio_price: Number(rates.trio_price) || 0,
-      group4_price: Number(rates.group4_price) || 0,
-      monthly_price: Number(rates.monthly_price) || 0,
-      updated_at: new Date().toISOString(),
-    }).eq('profesor_id', user.id)
-    await supabase.from('profiles').update({ currency: rates.currency }).eq('id', user.id)
+    const active = pricesByCurrency[currency] || EMPTY_PRICES
+    const normalized = {}
+    ALL_FIELDS.forEach((f) => (normalized[f] = Number(active[f]) || 0))
+    const updatedByCurrency = { ...pricesByCurrency, [currency]: normalized }
+
+    await supabase
+      .from('rates')
+      .update({
+        currency,
+        ...normalized,
+        prices_by_currency: updatedByCurrency,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('profesor_id', user.id)
+    await supabase.from('profiles').update({ currency }).eq('id', user.id)
     await refreshProfile()
+    setPricesByCurrency(updatedByCurrency)
     setSaving(false)
     setDirty(false)
   }
 
-  if (!rates) return null
+  if (!currency) return null
+  const active = pricesByCurrency[currency] || EMPTY_PRICES
 
   return (
-    <div className="max-w-lg mx-auto px-5 py-6 fade-in">
+    <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 fade-in">
       <Header backTo="/configuracion" backLabel="Configuración" />
       <h1 className="text-xl font-extrabold mb-0.5">Mis tarifas</h1>
-      <p className="text-slate-400 text-sm mb-5">Lo que le cobrás a cada alumno según el tamaño del grupo — se usa para armar tu Caja.</p>
+      <p className="text-slate-400 text-sm mb-5">Lo que le cobrás a cada alumno y lo que le dejás al club por cada clase — se usa para armar tu Caja.</p>
 
       <div className="card p-4">
         <div className="label-muted mb-2">Moneda</div>
-        <div className="flex gap-2 mb-5 flex-wrap">
+        <div className="flex gap-2 mb-2 flex-wrap">
           {CURRENCIES.map((c) => (
-            <button key={c} onClick={() => update('currency', c)} className={`pill ${rates.currency === c ? 'bg-white text-slate-900 font-bold' : 'card text-slate-300'}`}>
+            <button
+              key={c}
+              onClick={() => switchCurrency(c)}
+              className={`pill ${currency === c ? 'bg-brand text-slate-900 font-bold' : 'card text-slate-300'}`}
+            >
               {c}
             </button>
           ))}
         </div>
+        <p className="text-xs text-slate-500 mb-5">
+          Cada moneda tiene sus propios precios y comisiones — cambiá aquí entre {CURRENCIES.join(' / ')} sin que se mezclen los valores.
+        </p>
 
-        <div className="label-muted mb-1">Precio por alumno</div>
-        <PriceRow label="Individual" value={rates.individual_price} onChange={(v) => update('individual_price', v)} />
-        <PriceRow label="Dúo (c/u)" value={rates.duo_price} onChange={(v) => update('duo_price', v)} />
-        <PriceRow label="Trío (c/u)" value={rates.trio_price} onChange={(v) => update('trio_price', v)} />
-        <PriceRow label="Grupo de 4 (c/u)" value={rates.group4_price} onChange={(v) => update('group4_price', v)} last />
+        <div className="label-muted mb-1">Precio por alumno y comisión al club</div>
+        <p className="text-xs text-slate-500 mb-3">Cargá lo que le cobrás al alumno y, si le rendís algo al club por cada clase, cuánto es — te queda calculado lo que ganás vos.</p>
+        {ROWS.map((r, i) => (
+          <PriceCommissionRow
+            key={r.key}
+            label={r.label}
+            price={active[`${r.key}_price`]}
+            commission={active[`${r.key}_commission`]}
+            onPriceChange={(v) => update(`${r.key}_price`, v)}
+            onCommissionChange={(v) => update(`${r.key}_commission`, v)}
+            currency={currency}
+            last={i === ROWS.length - 1}
+          />
+        ))}
 
         <div className="label-muted mb-1 mt-4">Tarifa mensual (para alumnos que pagan por mes)</div>
-        <PriceRow label="Por mes, venga las veces que venga" value={rates.monthly_price} onChange={(v) => update('monthly_price', v)} last />
+        <PriceCommissionRow
+          label="Por mes, venga las veces que venga"
+          price={active.monthly_price}
+          commission={active.monthly_commission}
+          onPriceChange={(v) => update('monthly_price', v)}
+          onCommissionChange={(v) => update('monthly_commission', v)}
+          currency={currency}
+          last
+        />
 
         <button onClick={save} disabled={saving || !dirty} className="btn-primary mt-5">
-          Guardar tarifas
+          Guardar tarifas en {currency}
         </button>
       </div>
     </div>
   )
 }
 
-function PriceRow({ label, value, onChange, last }) {
+function PriceCommissionRow({ label, price, commission, onPriceChange, onCommissionChange, currency, last }) {
+  const neto = (Number(price) || 0) - (Number(commission) || 0)
   return (
-    <div className={`flex items-center justify-between py-3 ${!last ? 'border-b border-bg-border' : ''}`}>
-      <span className="text-sm font-medium">{label}</span>
-      <div className="flex items-center bg-bg-card border border-bg-border rounded-xl px-3 py-2 w-32">
+    <div className={`py-3 ${!last ? 'border-b border-bg-border' : ''}`}>
+      <div className="text-sm font-medium mb-2">{label}</div>
+      <div className="grid grid-cols-2 gap-2">
+        <MiniInput label="Tarifa al alumno" value={price} onChange={onPriceChange} />
+        <MiniInput label="Comisión al club" value={commission} onChange={onCommissionChange} />
+      </div>
+      {Number(price) > 0 && (
+        <div className="text-[11px] text-slate-500 mt-1.5">
+          Te queda <span className="text-brand font-semibold">${neto.toLocaleString('es-AR')} {currency}</span> por clase
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MiniInput({ label, value, onChange }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase font-semibold text-slate-500 mb-1">{label}</div>
+      <div className="flex items-center bg-bg-card border border-bg-border rounded-xl px-3 py-2">
         <span className="text-slate-500 mr-1">$</span>
         <input
           type="number"
