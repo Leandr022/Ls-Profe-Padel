@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import Header from '../../components/Header'
 import { ChevronRight } from '../../components/Icons'
+import { planLabel } from '../../lib/plans'
 
 const THEMES = [
   { key: 'auto', label: 'Auto' },
@@ -85,12 +86,12 @@ export default function SettingsHome() {
 
       <SettingsLink to="/configuracion/notificaciones" title="Notificaciones" desc="Elegí qué te queremos avisar sin que tengas que abrir la app." actionLabel="Entrar" />
 
-      <Section title="Mi plan">
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-slate-400">Te quedan {trialDaysLeft} días de prueba gratuita.</div>
-          <span className="text-xs font-bold text-brand bg-brand/10 px-3 py-1.5 rounded-full">Prueba gratuita</span>
-        </div>
-      </Section>
+      <SettingsLink
+        to="/configuracion/plan"
+        title="Mi plan"
+        desc={profile?.plan ? `Plan ${planLabel(profile.plan) || profile.plan}.` : `Te quedan ${trialDaysLeft} días de prueba gratuita.`}
+        actionLabel={profile?.plan ? 'Cambiar' : 'Elegir plan'}
+      />
 
       <Section title="Soporte">
         <div className="font-semibold text-sm">Contactanos</div>

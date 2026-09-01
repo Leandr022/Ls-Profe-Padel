@@ -15,6 +15,7 @@ import RatesSettings from './pages/settings/RatesSettings'
 import NotificationsSettings from './pages/settings/NotificationsSettings'
 import MessagesSettings from './pages/settings/MessagesSettings'
 import DebtSettings from './pages/settings/DebtSettings'
+import PlanSettings from './pages/settings/PlanSettings'
 
 function useThemeSync() {
   const { profile } = useAuth()
@@ -67,6 +68,7 @@ export default function App() {
       <Route path="/configuracion/notificaciones" element={<ProtectedRoute><NotificationsSettings /></ProtectedRoute>} />
       <Route path="/configuracion/mensajes" element={<ProtectedRoute><MessagesSettings /></ProtectedRoute>} />
       <Route path="/configuracion/deuda" element={<ProtectedRoute><DebtSettings /></ProtectedRoute>} />
+      <Route path="/configuracion/plan" element={<ProtectedRoute><PlanSettings /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

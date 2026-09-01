@@ -150,7 +150,9 @@ export default function Calendar() {
           slots={slots}
           classes={classesMap[toISODate(cursor)] || []}
           loading={loading}
-          onSlotClick={(time, existingClass) => setActiveSlot({ iso: toISODate(cursor), time, existingClass })}
+          onSlotClick={(time, existingClasses) =>
+            setActiveSlot({ iso: toISODate(cursor), time, dayIdx: jsDayToIdx(cursor.getDay()), existingClasses })
+          }
         />
       )}
 
@@ -198,7 +200,9 @@ function DayView({ date, workingDays, slots, classes, loading, onSlotClick }) {
   const hours = computeHoursForDay(dayIdx, workingDays, slots)
   const byTime = {}
   classes.forEach((c) => {
-    byTime[c.start_time?.slice(0, 5)] = c
+    const key = c.start_time?.slice(0, 5)
+    if (!byTime[key]) byTime[key] = []
+    byTime[key].push(c)
   })
 
   if (!loading && hours.length === 0) {
@@ -218,22 +222,28 @@ function DayView({ date, workingDays, slots, classes, loading, onSlotClick }) {
       </a>
       <div className="card divide-y divide-bg-border mt-3">
         {hours.map((h) => {
-          const c = byTime[h]
+          const list = byTime[h] || []
+          const allPaid = list.length > 0 && list.every((c) => c.paid)
           return (
             <button
               key={h}
-              onClick={() => onSlotClick(h, c || null)}
+              onClick={() => onSlotClick(h, list)}
               className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-white/5 transition"
             >
               <span className="text-slate-300 font-medium">{h}</span>
-              {c ? (
-                <span className="flex items-center gap-2">
-                  <span className="font-semibold">
-                    {c.students?.name || 'Alumno'}
-                    {c.students?.category && <span className="text-slate-400 font-normal"> / {categoryLabel(c.students.category, c.students.category_level)}</span>}
+              {list.length > 0 ? (
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className="font-semibold truncate">
+                    {list.map((c, i) => (
+                      <span key={c.id}>
+                        {i > 0 && ', '}
+                        {c.students?.name || 'Alumno'}
+                        {c.students?.category && <span className="text-slate-400 font-normal"> / {categoryLabel(c.students.category, c.students.category_level)}</span>}
+                      </span>
+                    ))}
                   </span>
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${c.paid ? 'bg-brand/20 text-brand' : 'bg-amber-500/20 text-amber-400'}`}>
-                    {c.paid ? 'Pagó' : 'Debe'}
+                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full shrink-0 ${allPaid ? 'bg-brand/20 text-brand' : 'bg-amber-500/20 text-amber-400'}`}>
+                    {allPaid ? 'Pagó' : 'Debe'}
                   </span>
                 </span>
               ) : (
@@ -259,6 +269,8 @@ function WeekView({ cursor, workingDays, slots, classesMap, onSelectDay }) {
         const dayIdx = jsDayToIdx(d.getDay())
         const hours = computeHoursForDay(dayIdx, workingDays, slots)
         const dayClasses = classesMap[iso] || []
+        const occupiedTimes = new Set(dayClasses.map((c) => c.start_time?.slice(0, 5)))
+        const freeHuecos = hours.filter((h) => !occupiedTimes.has(h)).length
         const isToday = iso === today
         return (
           <button
@@ -273,7 +285,7 @@ function WeekView({ cursor, workingDays, slots, classesMap, onSelectDay }) {
             <div className="flex-1 text-sm text-slate-400">
               {hours.length === 0
                 ? 'Sin clases'
-                : `${dayClasses.length ? `${dayClasses.length} clase${dayClasses.length > 1 ? 's' : ''}` : 'Sin clases'} · ${hours.length - dayClasses.length} huecos`}
+                : `${dayClasses.length ? `${dayClasses.length} alumno${dayClasses.length > 1 ? 's' : ''}` : 'Sin clases'} · ${freeHuecos} huecos libres`}
             </div>
             <ChevronRight className="text-slate-500" />
           </button>
