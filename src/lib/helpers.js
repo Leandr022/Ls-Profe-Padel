@@ -1,6 +1,20 @@
 export const DAY_NAMES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 export const DAY_NAMES_FULL = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 export const CURRENCIES = ['ARS', 'UYU', 'MXN', 'USD', 'CLP']
+export const CATEGORIES = ['8va', '7ma', '6ta', '5ta', '4ta', '3ra', '2da', '1ra']
+export const GENDERS = [
+  { key: 'Damas', label: 'Damas' },
+  { key: 'Caballeros', label: 'Caballeros' },
+]
+export const LEVEL_MODS = [
+  { key: '+', label: 'Alta +' },
+  { key: '-', label: 'Baja -' },
+]
+
+export function categoryLabel(category, level) {
+  if (!category) return ''
+  return `${category}${level || ''}`
+}
 
 export function jsDayToIdx(jsDay) {
   // JS: 0=domingo..6=sábado -> nuestro: 0=lunes..6=domingo

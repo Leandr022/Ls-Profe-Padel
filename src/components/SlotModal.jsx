@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { formatMoney, waLink, fillTemplate, groupSizeLabel, DAY_NAMES_FULL, jsDayToIdx } from '../lib/helpers'
+import { formatMoney, waLink, fillTemplate, groupSizeLabel, DAY_NAMES_FULL, jsDayToIdx, CATEGORIES, GENDERS, LEVEL_MODS, categoryLabel } from '../lib/helpers'
 import { CloseIcon, WhatsAppIcon } from './Icons'
 
 const GROUP_SIZES = [
@@ -20,7 +20,9 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
   const [query, setQuery] = useState('')
   const [newName, setNewName] = useState('')
   const [newPhone, setNewPhone] = useState('')
+  const [newGender, setNewGender] = useState('')
   const [newCategory, setNewCategory] = useState('')
+  const [newCategoryLevel, setNewCategoryLevel] = useState('')
   const [groupSize, setGroupSize] = useState('individual')
   const [saving, setSaving] = useState(false)
 
@@ -66,7 +68,9 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
         profesor_id: user.id,
         name: newName.trim(),
         phone: newPhone.trim() || null,
-        category: newCategory.trim() || null,
+        gender: newGender || null,
+        category: newCategory || null,
+        category_level: newCategory ? newCategoryLevel || null : null,
         group_size: groupSize,
         day_of_week: dayIdx,
         time_slot: slot.time,
@@ -162,7 +166,7 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
                   target="_blank"
                   rel="noreferrer"
                   onClick={markNotified}
-                  className="btn-secondary flex items-center justify-center gap-1.5 text-emerald-400"
+                  className="btn-secondary flex items-center justify-center gap-1.5 text-brand"
                 >
                   <WhatsAppIcon size={16} /> Recordar
                 </a>
@@ -210,7 +214,7 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
                       className="w-full text-left card p-3 flex items-center justify-between hover:border-brand/40"
                     >
                       <span className="font-medium">{s.name}</span>
-                      <span className="text-xs text-slate-500">{groupSizeLabel(s.group_size)}</span>
+                      <span className="text-xs text-slate-500">{s.category ? categoryLabel(s.category, s.category_level) : groupSizeLabel(s.group_size)}</span>
                     </button>
                   ))}
                 </div>
@@ -221,7 +225,35 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
               <div className="space-y-3">
                 <input className="input" placeholder="Nombre del alumno" value={newName} onChange={(e) => setNewName(e.target.value)} />
                 <input className="input" placeholder="WhatsApp (opcional)" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
-                <input className="input" placeholder="Categoría (opcional)" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} />
+                <div>
+                  <div className="label-muted mb-1.5">Género</div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {GENDERS.map((g) => (
+                      <button key={g.key} onClick={() => setNewGender(newGender === g.key ? '' : g.key)} className={`py-2 rounded-xl text-xs font-semibold ${newGender === g.key ? 'bg-brand text-slate-900' : 'card text-slate-300'}`}>
+                        {g.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="label-muted mb-1.5">Categoría</div>
+                  <div className="grid grid-cols-4 gap-1.5 mb-2">
+                    {CATEGORIES.map((c) => (
+                      <button key={c} onClick={() => setNewCategory(newCategory === c ? '' : c)} className={`py-2 rounded-xl text-xs font-semibold ${newCategory === c ? 'bg-brand text-slate-900' : 'card text-slate-300'}`}>
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                  {newCategory && (
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {LEVEL_MODS.map((l) => (
+                        <button key={l.key} onClick={() => setNewCategoryLevel(newCategoryLevel === l.key ? '' : l.key)} className={`py-2 rounded-xl text-xs font-semibold ${newCategoryLevel === l.key ? 'bg-brand text-slate-900' : 'card text-slate-300'}`}>
+                          {l.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div>
                   <div className="label-muted mb-1.5">Tamaño de grupo</div>
                   <div className="grid grid-cols-4 gap-1.5">

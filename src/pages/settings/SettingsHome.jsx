@@ -94,14 +94,14 @@ export default function SettingsHome() {
 
       <Section title="Soporte">
         <div className="font-semibold text-sm">Contactanos</div>
-        <a href="mailto:profepadel.app@gmail.com" className="text-xs text-slate-400">profepadel.app@gmail.com</a>
+        <a href="mailto:leandro.santagada@icloud.com" className="text-xs text-slate-400">leandro.santagada@icloud.com</a>
       </Section>
 
       <Section title="Novedades">
-        <a href="https://instagram.com/profepadel.app" target="_blank" rel="noreferrer" className="flex items-center justify-between">
+        <a href="https://instagram.com/ProfePadel" target="_blank" rel="noreferrer" className="flex items-center justify-between">
           <div>
             <div className="font-semibold text-sm">Todo lo nuevo, primero en Instagram</div>
-            <div className="text-xs text-slate-400">@profepadel.app</div>
+            <div className="text-xs text-slate-400">@ProfePadel</div>
           </div>
           <ChevronRight className="text-slate-500" />
         </a>

@@ -102,13 +102,13 @@ export default function Caja() {
           <div className="text-xl font-extrabold mt-1">{loading ? '–' : formatMoney(totalDebe, profile?.currency)}</div>
           <div className="text-[11px] text-red-300/70 mt-0.5">{debtByStudent.length} alumnos</div>
         </button>
-        <button onClick={() => setOpenSection(openSection === 'pagaron' ? null : 'pagaron')} className="text-left rounded-2xl bg-emerald-950/40 border border-emerald-800/40 p-4">
+        <button onClick={() => setOpenSection(openSection === 'pagaron' ? null : 'pagaron')} className="text-left rounded-2xl bg-brand/10 border border-brand/30 p-4">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-brand">Ya pagaron</span>
             <Chev className={`text-brand transition ${openSection === 'pagaron' ? 'rotate-90' : ''}`} size={14} />
           </div>
           <div className="text-xl font-extrabold mt-1">{loading ? '–' : formatMoney(totalPagaron, profile?.currency)}</div>
-          <div className="text-[11px] text-emerald-300/70 mt-0.5">{paidByStudent.length} alumnos</div>
+          <div className="text-[11px] text-blue-300/70 mt-0.5">{paidByStudent.length} alumnos</div>
         </button>
       </div>
 

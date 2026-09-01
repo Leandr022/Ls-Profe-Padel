@@ -9,11 +9,11 @@ import {
   toISODate,
   addDays,
   startOfWeek,
-  timeSlots,
   monthLabel,
   formatMoneyShort,
   waLink,
   fillTemplate,
+  categoryLabel,
 } from '../lib/helpers'
 import Header from '../components/Header'
 import { ChevronLeft, ChevronRight, CloseIcon, WhatsAppIcon } from '../components/Icons'
@@ -23,9 +23,8 @@ function computeHoursForDay(dayIdx, workingDays, slots) {
   const wd = workingDays.find((w) => w.day_of_week === dayIdx)
   if (!wd || !wd.enabled) return []
   const custom = slots.filter((s) => s.day_of_week === dayIdx)
-  const ranges = custom.length ? custom : slots.filter((s) => s.day_of_week === null)
-  const set = new Set()
-  ranges.forEach((r) => timeSlots(r.start_time?.slice(0, 5), r.end_time?.slice(0, 5)).forEach((h) => set.add(h)))
+  const applicable = custom.length ? custom : slots.filter((s) => s.day_of_week === null)
+  const set = new Set(applicable.map((s) => s.start_time?.slice(0, 5)).filter(Boolean))
   return [...set].sort()
 }
 
@@ -56,7 +55,7 @@ export default function Calendar() {
       if (!user) return
       const { data } = await supabase
         .from('classes')
-        .select('*, students(id, name, phone)')
+        .select('*, students(id, name, phone, category, category_level)')
         .eq('profesor_id', user.id)
         .gte('class_date', toISODate(fromDate))
         .lte('class_date', toISODate(toDate))
@@ -229,7 +228,10 @@ function DayView({ date, workingDays, slots, classes, loading, onSlotClick }) {
               <span className="text-slate-300 font-medium">{h}</span>
               {c ? (
                 <span className="flex items-center gap-2">
-                  <span className="font-semibold">{c.students?.name || 'Alumno'}</span>
+                  <span className="font-semibold">
+                    {c.students?.name || 'Alumno'}
+                    {c.students?.category && <span className="text-slate-400 font-normal"> / {categoryLabel(c.students.category, c.students.category_level)}</span>}
+                  </span>
                   <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${c.paid ? 'bg-brand/20 text-brand' : 'bg-amber-500/20 text-amber-400'}`}>
                     {c.paid ? 'Pagó' : 'Debe'}
                   </span>

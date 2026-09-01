@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { DAY_NAMES_FULL, groupSizeLabel } from '../lib/helpers'
+import { DAY_NAMES_FULL, groupSizeLabel, GENDERS, categoryLabel } from '../lib/helpers'
 import Header from '../components/Header'
 import StudentFormModal from '../components/StudentFormModal'
 import { PlusIcon, UsersIcon } from '../components/Icons'
@@ -48,7 +48,7 @@ export default function Students() {
 
       <input className="input mb-3" placeholder="Buscar alumno..." value={query} onChange={(e) => setQuery(e.target.value)} />
 
-      <button onClick={() => setModalStudent(null)} className="w-full rounded-full bg-emerald-900/40 border border-emerald-700/40 text-brand font-semibold py-2.5 mb-3">
+      <button onClick={() => setModalStudent(null)} className="w-full rounded-full bg-brand/10 border border-brand/30 text-brand font-semibold py-2.5 mb-3">
         + Agregar alumno
       </button>
 
@@ -62,9 +62,9 @@ export default function Students() {
       <div className="grid grid-cols-2 gap-2 mb-2">
         <select className="input" value={genderFilter} onChange={(e) => setGenderFilter(e.target.value)}>
           <option value="">Todos los géneros</option>
-          <option value="M">Masculino</option>
-          <option value="F">Femenino</option>
-          <option value="Otro">Otro</option>
+          {GENDERS.map((g) => (
+            <option key={g.key} value={g.key}>{g.label}</option>
+          ))}
         </select>
         <select className="input" value={dayFilter} onChange={(e) => setDayFilter(e.target.value)}>
           <option value="">Todos los días</option>
@@ -98,7 +98,8 @@ export default function Students() {
               <div className="font-semibold truncate">{s.name}</div>
               <div className="text-xs text-slate-400 truncate">
                 {groupSizeLabel(s.group_size)}
-                {s.category ? ` · ${s.category}` : ''}
+                {s.category ? ` · ${categoryLabel(s.category, s.category_level)}` : ''}
+                {s.gender ? ` · ${s.gender}` : ''}
                 {s.day_of_week != null ? ` · ${DAY_NAMES_FULL[s.day_of_week]}${s.time_slot ? ' ' + s.time_slot.slice(0, 5) : ''}` : ''}
               </div>
             </div>

@@ -1,22 +1,20 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { DAY_NAMES, DAY_NAMES_FULL } from '../../lib/helpers'
+import { DAY_NAMES, DAY_NAMES_FULL, timeSlots } from '../../lib/helpers'
 import Header from '../../components/Header'
 import { ChevronRight, PlusIcon, CloseIcon } from '../../components/Icons'
 
 export default function ScheduleSettings() {
   const { user } = useAuth()
   const [workingDays, setWorkingDays] = useState({}) // {0: true, ...}
-  const [defaultSlots, setDefaultSlots] = useState([{ start: '08:00', end: '16:30' }])
-  const [customByDay, setCustomByDay] = useState({}) // {dayIdx: [{start,end}]}
+  const [defaultTimes, setDefaultTimes] = useState([]) // ['08:00', '09:30', ...]
+  const [customByDay, setCustomByDay] = useState({}) // {dayIdx: ['08:00', ...]}
   const [editingDay, setEditingDay] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [loading, setLoading] = useState(true)
 
   async function load() {
     if (!user) return
-    setLoading(true)
     const [{ data: wd }, { data: sl }] = await Promise.all([
       supabase.from('working_days').select('*').eq('profesor_id', user.id),
       supabase.from('schedule_slots').select('*').eq('profesor_id', user.id),
@@ -25,16 +23,16 @@ export default function ScheduleSettings() {
     ;(wd || []).forEach((r) => (wdMap[r.day_of_week] = r.enabled))
     setWorkingDays(wdMap)
 
-    const defaults = (sl || []).filter((s) => s.day_of_week === null).map((s) => ({ start: s.start_time.slice(0, 5), end: s.end_time.slice(0, 5) }))
-    setDefaultSlots(defaults.length ? defaults : [{ start: '08:00', end: '16:30' }])
+    const defaults = [...new Set((sl || []).filter((s) => s.day_of_week === null).map((s) => s.start_time.slice(0, 5)))].sort()
+    setDefaultTimes(defaults)
 
     const custom = {}
     ;(sl || []).filter((s) => s.day_of_week !== null).forEach((s) => {
       if (!custom[s.day_of_week]) custom[s.day_of_week] = []
-      custom[s.day_of_week].push({ start: s.start_time.slice(0, 5), end: s.end_time.slice(0, 5) })
+      custom[s.day_of_week].push(s.start_time.slice(0, 5))
     })
+    Object.keys(custom).forEach((k) => custom[k].sort())
     setCustomByDay(custom)
-    setLoading(false)
   }
 
   useEffect(() => {
@@ -54,9 +52,9 @@ export default function ScheduleSettings() {
 
     await supabase.from('schedule_slots').delete().eq('profesor_id', user.id)
     const rows = []
-    defaultSlots.forEach((s) => rows.push({ profesor_id: user.id, day_of_week: null, start_time: s.start, end_time: s.end }))
-    Object.entries(customByDay).forEach(([day, slots]) => {
-      slots.forEach((s) => rows.push({ profesor_id: user.id, day_of_week: Number(day), start_time: s.start, end_time: s.end }))
+    defaultTimes.forEach((t) => rows.push({ profesor_id: user.id, day_of_week: null, start_time: t, end_time: t }))
+    Object.entries(customByDay).forEach(([day, times]) => {
+      times.forEach((t) => rows.push({ profesor_id: user.id, day_of_week: Number(day), start_time: t, end_time: t }))
     })
     if (rows.length) await supabase.from('schedule_slots').insert(rows)
     setSaving(false)
@@ -84,14 +82,14 @@ export default function ScheduleSettings() {
       </div>
 
       <div className="card p-4 mb-3">
-        <div className="label-muted mb-1">Horario habitual</div>
-        <p className="text-xs text-slate-500 mb-3">Vale para todos tus días de clases, salvo los que tengan horario distinto abajo.</p>
-        <SlotEditor slots={defaultSlots} onChange={setDefaultSlots} />
+        <div className="label-muted mb-1">Horarios habituales</div>
+        <p className="text-xs text-slate-500 mb-3">Los horarios exactos en los que das clase. Valen para todos tus días de clases, salvo los que personalices abajo.</p>
+        <TimeListEditor times={defaultTimes} onChange={setDefaultTimes} />
       </div>
 
       <div className="card p-4 mb-3">
         <div className="label-muted mb-1">Personalizar por día</div>
-        <p className="text-xs text-slate-500 mb-3">¿Un día trabajás distinto? Dale su horario sin tocar el resto.</p>
+        <p className="text-xs text-slate-500 mb-3">¿Un día tenés otros horarios? Definilos sin tocar el resto.</p>
         <div className="divide-y divide-bg-border -mx-4">
           {DAY_NAMES_FULL.map((d, i) => {
             const custom = customByDay[i]
@@ -100,7 +98,7 @@ export default function ScheduleSettings() {
                 <span className="font-bold text-sm">{d}</span>
                 <span className="flex items-center gap-1 text-xs">
                   {custom?.length ? (
-                    <span className="text-brand font-semibold">distinto: {custom.map((s) => `${s.start}–${s.end}`).join(' · ')}</span>
+                    <span className="text-brand font-semibold">distinto: {custom.join(' · ')}</span>
                   ) : (
                     <span className="text-slate-500">horario habitual</span>
                   )}
@@ -119,51 +117,89 @@ export default function ScheduleSettings() {
       {editingDay !== null && (
         <DayEditorModal
           dayIdx={editingDay}
-          slots={customByDay[editingDay] || []}
+          times={customByDay[editingDay] || []}
           onClose={() => setEditingDay(null)}
-          onChange={(slots) => setCustomByDay((c) => ({ ...c, [editingDay]: slots }))}
+          onChange={(times) => setCustomByDay((c) => ({ ...c, [editingDay]: times }))}
         />
       )}
     </div>
   )
 }
 
-function SlotEditor({ slots, onChange }) {
-  function update(i, field, value) {
-    const next = [...slots]
-    next[i] = { ...next[i], [field]: value }
-    onChange(next)
+// Lista de horarios sueltos (chips), con opción de agregar uno por uno o generar varios desde un rango
+function TimeListEditor({ times, onChange }) {
+  const [newTime, setNewTime] = useState('')
+  const [rangeFrom, setRangeFrom] = useState('08:00')
+  const [rangeTo, setRangeTo] = useState('12:00')
+  const [duration, setDuration] = useState(60)
+  const [showGenerator, setShowGenerator] = useState(false)
+
+  function addTime() {
+    if (!newTime || times.includes(newTime)) return
+    onChange([...times, newTime].sort())
+    setNewTime('')
   }
-  function remove(i) {
-    onChange(slots.filter((_, idx) => idx !== i))
+
+  function removeTime(t) {
+    onChange(times.filter((x) => x !== t))
   }
-  function add() {
-    onChange([...slots, { start: '08:00', end: '12:00' }])
+
+  function generateFromRange() {
+    const generated = timeSlots(rangeFrom, rangeTo, Number(duration) || 60)
+    const merged = [...new Set([...times, ...generated])].sort()
+    onChange(merged)
+    setShowGenerator(false)
   }
 
   return (
-    <div className="space-y-2">
-      {slots.map((s, i) => (
-        <div key={i} className="flex items-center gap-2 text-sm">
-          <span className="text-slate-500">De:</span>
-          <input type="time" className="input" value={s.start} onChange={(e) => update(i, 'start', e.target.value)} />
-          <span className="text-slate-500">hasta:</span>
-          <input type="time" className="input" value={s.end} onChange={(e) => update(i, 'end', e.target.value)} />
-          {slots.length > 1 && (
-            <button onClick={() => remove(i)} className="text-red-400 shrink-0"><CloseIcon size={14} /></button>
-          )}
+    <div>
+      {times.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {times.map((t) => (
+            <span key={t} className="flex items-center gap-1.5 bg-bg-card border border-bg-border rounded-full pl-3 pr-1.5 py-1 text-sm font-medium">
+              {t}
+              <button onClick={() => removeTime(t)} className="text-slate-500 hover:text-red-400"><CloseIcon size={12} /></button>
+            </span>
+          ))}
         </div>
-      ))}
-      <button onClick={add} className="text-brand text-xs font-semibold flex items-center gap-1">
-        <PlusIcon size={14} /> Agregar otra franja (ej: la tarde)
+      )}
+
+      <div className="flex gap-2 mb-2">
+        <input type="time" className="input" value={newTime} onChange={(e) => setNewTime(e.target.value)} />
+        <button onClick={addTime} disabled={!newTime} className="btn-secondary shrink-0">+ Agregar horario</button>
+      </div>
+
+      <button onClick={() => setShowGenerator((v) => !v)} className="text-brand text-xs font-semibold flex items-center gap-1">
+        <PlusIcon size={14} /> Generar varios horarios desde un rango
       </button>
+
+      {showGenerator && (
+        <div className="card p-3 mt-2 space-y-2">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-slate-500">De:</span>
+            <input type="time" className="input" value={rangeFrom} onChange={(e) => setRangeFrom(e.target.value)} />
+            <span className="text-slate-500">hasta:</span>
+            <input type="time" className="input" value={rangeTo} onChange={(e) => setRangeTo(e.target.value)} />
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-slate-500">Cada:</span>
+            <select className="input" value={duration} onChange={(e) => setDuration(e.target.value)}>
+              <option value="30">30 min</option>
+              <option value="60">60 min</option>
+              <option value="90">90 min</option>
+              <option value="120">120 min</option>
+            </select>
+          </div>
+          <button onClick={generateFromRange} className="btn-secondary w-full">Agregar estos horarios</button>
+        </div>
+      )}
     </div>
   )
 }
 
-function DayEditorModal({ dayIdx, slots, onClose, onChange }) {
-  const [local, setLocal] = useState(slots.length ? slots : [{ start: '08:00', end: '16:30' }])
-  const [useCustom, setUseCustom] = useState(slots.length > 0)
+function DayEditorModal({ dayIdx, times, onClose, onChange }) {
+  const [local, setLocal] = useState(times)
+  const [useCustom, setUseCustom] = useState(times.length > 0)
 
   function save() {
     onChange(useCustom ? local : [])
@@ -178,7 +214,7 @@ function DayEditorModal({ dayIdx, slots, onClose, onChange }) {
           <button onClick={onClose} className="text-slate-400"><CloseIcon /></button>
         </div>
         <div className="flex items-center justify-between card p-3 mb-4">
-          <span className="text-sm font-medium">Usar horario distinto este día</span>
+          <span className="text-sm font-medium">Usar horarios distintos este día</span>
           <button
             onClick={() => setUseCustom((v) => !v)}
             className={`text-xs font-bold uppercase px-3 py-1.5 rounded-full ${useCustom ? 'bg-brand text-slate-900' : 'card text-slate-400'}`}
@@ -186,7 +222,7 @@ function DayEditorModal({ dayIdx, slots, onClose, onChange }) {
             {useCustom ? 'Sí' : 'No'}
           </button>
         </div>
-        {useCustom && <SlotEditor slots={local} onChange={setLocal} />}
+        {useCustom && <TimeListEditor times={local} onChange={setLocal} />}
         <button onClick={save} className="btn-primary mt-4">Guardar</button>
       </div>
     </div>

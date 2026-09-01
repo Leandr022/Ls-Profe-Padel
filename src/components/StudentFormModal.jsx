@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { DAY_NAMES_FULL, waLink, fillTemplate, formatMoney } from '../lib/helpers'
+import { DAY_NAMES_FULL, waLink, fillTemplate, formatMoney, CATEGORIES, GENDERS, LEVEL_MODS } from '../lib/helpers'
 import { CloseIcon, WhatsAppIcon } from './Icons'
 
 const GROUP_SIZES = [
@@ -11,7 +11,6 @@ const GROUP_SIZES = [
   { key: 'grupo4', label: 'Grupo de 4' },
   { key: 'mensual', label: 'Mensual' },
 ]
-const GENDERS = ['M', 'F', 'Otro']
 
 export default function StudentFormModal({ student, onClose, onSaved }) {
   const { user, profile } = useAuth()
@@ -20,6 +19,7 @@ export default function StudentFormModal({ student, onClose, onSaved }) {
   const [phone, setPhone] = useState(student?.phone || '')
   const [gender, setGender] = useState(student?.gender || '')
   const [category, setCategory] = useState(student?.category || '')
+  const [categoryLevel, setCategoryLevel] = useState(student?.category_level || '')
   const [groupSize, setGroupSize] = useState(student?.group_size || 'individual')
   const [dayOfWeek, setDayOfWeek] = useState(student?.day_of_week ?? '')
   const [timeSlot, setTimeSlot] = useState(student?.time_slot?.slice(0, 5) || '')
@@ -49,7 +49,8 @@ export default function StudentFormModal({ student, onClose, onSaved }) {
       name: name.trim(),
       phone: phone.trim() || null,
       gender: gender || null,
-      category: category.trim() || null,
+      category: category || null,
+      category_level: category ? categoryLevel || null : null,
       group_size: groupSize,
       day_of_week: dayOfWeek === '' ? null : Number(dayOfWeek),
       time_slot: timeSlot || null,
@@ -87,16 +88,34 @@ export default function StudentFormModal({ student, onClose, onSaved }) {
 
           <div>
             <div className="label-muted mb-1.5">Género</div>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
               {GENDERS.map((g) => (
-                <button key={g} onClick={() => setGender(gender === g ? '' : g)} className={`py-2 rounded-xl text-xs font-semibold ${gender === g ? 'bg-brand text-slate-900' : 'card text-slate-300'}`}>
-                  {g}
+                <button key={g.key} onClick={() => setGender(gender === g.key ? '' : g.key)} className={`py-2 rounded-xl text-xs font-semibold ${gender === g.key ? 'bg-brand text-slate-900' : 'card text-slate-300'}`}>
+                  {g.label}
                 </button>
               ))}
             </div>
           </div>
 
-          <input className="input" placeholder="Categoría (ej: 5ta, principiante)" value={category} onChange={(e) => setCategory(e.target.value)} />
+          <div>
+            <div className="label-muted mb-1.5">Categoría</div>
+            <div className="grid grid-cols-4 gap-1.5 mb-2">
+              {CATEGORIES.map((c) => (
+                <button key={c} onClick={() => setCategory(category === c ? '' : c)} className={`py-2 rounded-xl text-xs font-semibold ${category === c ? 'bg-brand text-slate-900' : 'card text-slate-300'}`}>
+                  {c}
+                </button>
+              ))}
+            </div>
+            {category && (
+              <div className="grid grid-cols-2 gap-1.5">
+                {LEVEL_MODS.map((l) => (
+                  <button key={l.key} onClick={() => setCategoryLevel(categoryLevel === l.key ? '' : l.key)} className={`py-2 rounded-xl text-xs font-semibold ${categoryLevel === l.key ? 'bg-brand text-slate-900' : 'card text-slate-300'}`}>
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div>
             <div className="label-muted mb-1.5">Tamaño de grupo</div>
@@ -133,10 +152,10 @@ export default function StudentFormModal({ student, onClose, onSaved }) {
 
           {isEdit && phone && (
             <div className="grid grid-cols-2 gap-2">
-              <a href={waLink(phone, fillTemplate(templates.recordatorio || '', { nombre: name, hora: timeSlot || '' }))} target="_blank" rel="noreferrer" className="btn-secondary flex items-center justify-center gap-1.5 text-emerald-400">
+              <a href={waLink(phone, fillTemplate(templates.recordatorio || '', { nombre: name, hora: timeSlot || '' }))} target="_blank" rel="noreferrer" className="btn-secondary flex items-center justify-center gap-1.5 text-brand">
                 <WhatsAppIcon size={16} /> Recordatorio
               </a>
-              <a href={waLink(phone, fillTemplate(templates.reconquista || '', { nombre: name }))} target="_blank" rel="noreferrer" className="btn-secondary flex items-center justify-center gap-1.5 text-emerald-400">
+              <a href={waLink(phone, fillTemplate(templates.reconquista || '', { nombre: name }))} target="_blank" rel="noreferrer" className="btn-secondary flex items-center justify-center gap-1.5 text-brand">
                 <WhatsAppIcon size={16} /> Reconquista
               </a>
             </div>
