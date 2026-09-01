@@ -1,0 +1,12 @@
+{
+  "name": "ProfePadel",
+  "short_name": "ProfePadel",
+  "description": "Organizá tus clases de pádel: alumnos, horarios, cobros y estadísticas.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0c1220",
+  "theme_color": "#0c1220",
+  "icons": [
+    { "src": "/logo.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

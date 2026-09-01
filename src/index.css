@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  background-color: #0c1220;
+  color: #e6e9f0;
+}
+
+html.light body {
+  background-color: #f4f6fa;
+  color: #131a2a;
+}
+
+html.font-large {
+  font-size: 17px;
+}
+html.font-xlarge {
+  font-size: 19px;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a3350 transparent;
+}
+
+.card {
+  @apply bg-bg-panel border border-bg-border rounded-2xl;
+}
+html.light .card {
+  @apply bg-white border-slate-200;
+}
+
+.pill {
+  @apply rounded-full px-4 py-2 text-sm font-medium;
+}
+
+.btn-primary {
+  @apply w-full rounded-full bg-brand text-slate-900 font-bold py-3.5 transition active:scale-[0.98] hover:brightness-110 disabled:opacity-50 disabled:pointer-events-none;
+}
+
+.btn-secondary {
+  @apply rounded-full bg-bg-card border border-bg-border px-4 py-2 text-sm font-semibold text-slate-100 transition active:scale-[0.98] hover:bg-white/5;
+}
+html.light .btn-secondary {
+  @apply bg-slate-100 border-slate-200 text-slate-800;
+}
+
+.input {
+  @apply w-full rounded-xl bg-bg-card border border-bg-border px-4 py-2.5 text-sm placeholder:text-slate-500 outline-none focus:border-brand transition;
+}
+html.light .input {
+  @apply bg-white border-slate-200 text-slate-900;
+}
+
+.label-muted {
+  @apply text-[11px] font-semibold tracking-wide uppercase text-slate-500;
+}
+
+.fade-in {
+  animation: fadeIn 0.18s ease-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
