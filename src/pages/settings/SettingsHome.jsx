@@ -99,10 +99,10 @@ export default function SettingsHome() {
       </Section>
 
       <Section title="Novedades">
-        <a href="https://instagram.com/ProfePadel" target="_blank" rel="noreferrer" className="flex items-center justify-between">
+        <a href="https://instagram.com/Ls-Profe-Padel" target="_blank" rel="noreferrer" className="flex items-center justify-between">
           <div>
             <div className="font-semibold text-sm">Todo lo nuevo, primero en Instagram</div>
-            <div className="text-xs text-slate-400">@ProfePadel</div>
+            <div className="text-xs text-slate-400">@Ls-Profe-Padel</div>
           </div>
           <ChevronRight className="text-slate-500" />
         </a>
