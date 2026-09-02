@@ -16,6 +16,7 @@ export const PLANS = [
     savingsVsMonthly: null,
     badge: null,
     highlight: false,
+    durationDays: 30,
   },
   {
     key: 'trimestral',
@@ -28,6 +29,7 @@ export const PLANS = [
     badge: '-25%',
     highlight: true,
     tag: 'Más elegido',
+    durationDays: 90,
   },
   {
     key: 'anual',
@@ -39,8 +41,16 @@ export const PLANS = [
     savingsVsMonthly: 99800,
     badge: '-42%',
     highlight: false,
+    durationDays: 365,
   },
 ]
+
+// Días de aviso antes del vencimiento del plan para mostrar el cartel de renovación.
+export const RENEWAL_WARNING_DAYS = 3
+
+export function planByKey(key) {
+  return PLANS.find((p) => p.key === key) || null
+}
 
 export const CURRENCY_LABELS = {
   ARS: 'Pesos argentinos',

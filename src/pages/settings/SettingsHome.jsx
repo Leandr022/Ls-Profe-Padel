@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import Header from '../../components/Header'
 import { ChevronRight } from '../../components/Icons'
 import { planLabel } from '../../lib/plans'
+import { getAccessStatus } from '../../lib/access'
 
 const THEMES = [
   { key: 'auto', label: 'Auto' },
@@ -34,9 +35,7 @@ export default function SettingsHome() {
     await refreshProfile()
   }
 
-  const trialDaysLeft = profile
-    ? Math.max(0, 30 - Math.floor((Date.now() - new Date(profile.trial_started_at).getTime()) / 86400000))
-    : 30
+  const access = getAccessStatus(profile)
 
   return (
     <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 pb-16 fade-in">
@@ -89,8 +88,14 @@ export default function SettingsHome() {
       <SettingsLink
         to="/configuracion/plan"
         title="Mi plan"
-        desc={profile?.plan ? `Plan ${planLabel(profile.plan) || profile.plan}.` : `Te quedan ${trialDaysLeft} días de prueba gratuita.`}
-        actionLabel={profile?.plan ? 'Cambiar' : 'Elegir plan'}
+        desc={
+          profile?.unlimited_access
+            ? 'Acceso ilimitado.'
+            : profile?.plan
+              ? `Plan ${planLabel(profile.plan) || profile.plan} — te quedan ${Math.max(0, access.daysLeft)} día${access.daysLeft === 1 ? '' : 's'}.`
+              : `Te quedan ${Math.max(0, access.daysLeft)} días de prueba gratuita.`
+        }
+        actionLabel={profile?.unlimited_access ? 'Ver' : profile?.plan ? 'Cambiar' : 'Elegir plan'}
       />
 
       <Section title="Soporte">

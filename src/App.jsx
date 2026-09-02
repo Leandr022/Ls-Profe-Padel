@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
+import { getAccessStatus } from './lib/access'
+import RenewalBanner from './components/RenewalBanner'
 
 import Login from './pages/Login'
 import Home from './pages/Home'
@@ -41,10 +43,25 @@ function FullScreenLoader() {
 }
 
 function ProtectedRoute({ children }) {
-  const { session, loading } = useAuth()
+  const { session, loading, profile, profileLoading } = useAuth()
+  const location = useLocation()
   if (loading) return <FullScreenLoader />
   if (!session) return <Navigate to="/login" replace />
-  return children
+  if (profileLoading || !profile) return <FullScreenLoader />
+
+  const access = getAccessStatus(profile)
+  const isPlanPage = location.pathname === '/configuracion/plan'
+
+  if (access.blocked && !isPlanPage) {
+    return <Navigate to="/configuracion/plan" replace state={{ blocked: true, source: access.source }} />
+  }
+
+  return (
+    <>
+      {access.showWarning && !isPlanPage && <RenewalBanner daysLeft={access.daysLeft} source={access.source} />}
+      {children}
+    </>
+  )
 }
 
 export default function App() {
