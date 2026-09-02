@@ -14,6 +14,7 @@ import {
   waLink,
   fillTemplate,
   categoryLabel,
+  addMinutesToTime,
 } from '../lib/helpers'
 import Header from '../components/Header'
 import { ChevronLeft, ChevronRight, CloseIcon, WhatsAppIcon } from '../components/Icons'
@@ -26,6 +27,29 @@ function computeHoursForDay(dayIdx, workingDays, slots) {
   const applicable = custom.length ? custom : slots.filter((s) => s.day_of_week === null)
   const set = new Set(applicable.map((s) => s.start_time?.slice(0, 5)).filter(Boolean))
   return [...set].sort()
+}
+
+// Cada clase ocupa su horario de inicio + la duración configurada (end_time), así que un hueco
+// que cae DENTRO de una clase que ya empezó en un horario anterior no puede reservarse aparte:
+// se muestra ocupado por esa misma clase, en vez de "Libre".
+function buildOccupancy(hours, classes, defaultDuration) {
+  const byTime = {}
+  classes.forEach((c) => {
+    const key = c.start_time?.slice(0, 5)
+    if (!key) return
+    if (!byTime[key]) byTime[key] = []
+    byTime[key].push(c)
+  })
+  return hours.map((h) => {
+    if (byTime[h]) return { time: h, own: byTime[h], coveredBy: null }
+    const coveredBy = classes.find((c) => {
+      const s = c.start_time?.slice(0, 5)
+      if (!s) return false
+      const e = (c.end_time ? c.end_time.slice(0, 5) : addMinutesToTime(s, defaultDuration))
+      return s < h && h < e
+    })
+    return { time: h, own: null, coveredBy: coveredBy || null }
+  })
 }
 
 export default function Calendar() {
@@ -150,6 +174,7 @@ export default function Calendar() {
           slots={slots}
           classes={classesMap[toISODate(cursor)] || []}
           loading={loading}
+          defaultDuration={profile?.class_duration_minutes || 60}
           onSlotClick={(time, existingClasses) =>
             setActiveSlot({ iso: toISODate(cursor), time, dayIdx: jsDayToIdx(cursor.getDay()), existingClasses })
           }
@@ -162,6 +187,7 @@ export default function Calendar() {
           workingDays={workingDays}
           slots={slots}
           classesMap={classesMap}
+          defaultDuration={profile?.class_duration_minutes || 60}
           onSelectDay={(d) => {
             setCursor(d)
             setView('dia')
@@ -195,15 +221,11 @@ export default function Calendar() {
   )
 }
 
-function DayView({ date, workingDays, slots, classes, loading, onSlotClick }) {
+function DayView({ date, workingDays, slots, classes, loading, defaultDuration, onSlotClick }) {
   const dayIdx = jsDayToIdx(date.getDay())
   const hours = computeHoursForDay(dayIdx, workingDays, slots)
-  const byTime = {}
-  classes.forEach((c) => {
-    const key = c.start_time?.slice(0, 5)
-    if (!byTime[key]) byTime[key] = []
-    byTime[key].push(c)
-  })
+  const occupancy = buildOccupancy(hours, classes, defaultDuration)
+  const freeCount = occupancy.filter((o) => !o.own && !o.coveredBy).length
 
   if (!loading && hours.length === 0) {
     return (
@@ -216,14 +238,32 @@ function DayView({ date, workingDays, slots, classes, loading, onSlotClick }) {
 
   return (
     <>
-      <div className="text-xs text-slate-500 mb-1">{hours.length} huecos</div>
+      <div className="text-xs text-slate-500 mb-1">{freeCount} huecos libres de {hours.length}</div>
       <a href="/configuracion/horarios" className="text-brand text-xs font-semibold underline decoration-dotted">
         ¿Este día trabajás distinto? Ajustar solo este día
       </a>
       <div className="card divide-y divide-bg-border mt-3">
-        {hours.map((h) => {
-          const list = byTime[h] || []
+        {occupancy.map(({ time: h, own, coveredBy }) => {
+          const list = own || []
           const allPaid = list.length > 0 && list.every((c) => c.paid)
+          if (coveredBy) {
+            const startTime = coveredBy.start_time?.slice(0, 5)
+            return (
+              <button
+                key={h}
+                onClick={() => onSlotClick(startTime, classes.filter((c) => c.start_time?.slice(0, 5) === startTime))}
+                className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-white/5 transition"
+              >
+                <span className="text-slate-500 font-medium">{h}</span>
+                <span className="text-slate-500 text-sm flex items-center gap-1.5">
+                  Ocupado
+                  <span className="text-[10px] font-bold uppercase bg-bg-card border border-bg-border px-1.5 py-0.5 rounded-full text-slate-400">
+                    {coveredBy.students?.name || 'clase'} desde {startTime}
+                  </span>
+                </span>
+              </button>
+            )
+          }
           return (
             <button
               key={h}
@@ -257,7 +297,7 @@ function DayView({ date, workingDays, slots, classes, loading, onSlotClick }) {
   )
 }
 
-function WeekView({ cursor, workingDays, slots, classesMap, onSelectDay }) {
+function WeekView({ cursor, workingDays, slots, classesMap, defaultDuration, onSelectDay }) {
   const from = startOfWeek(cursor)
   const days = Array.from({ length: 7 }, (_, i) => addDays(from, i))
   const today = toISODate(new Date())
@@ -269,8 +309,8 @@ function WeekView({ cursor, workingDays, slots, classesMap, onSelectDay }) {
         const dayIdx = jsDayToIdx(d.getDay())
         const hours = computeHoursForDay(dayIdx, workingDays, slots)
         const dayClasses = classesMap[iso] || []
-        const occupiedTimes = new Set(dayClasses.map((c) => c.start_time?.slice(0, 5)))
-        const freeHuecos = hours.filter((h) => !occupiedTimes.has(h)).length
+        const occupancy = buildOccupancy(hours, dayClasses, defaultDuration)
+        const freeHuecos = occupancy.filter((o) => !o.own && !o.coveredBy).length
         const isToday = iso === today
         return (
           <button

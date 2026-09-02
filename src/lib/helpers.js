@@ -51,6 +51,15 @@ export function startOfWeek(date) {
   return addDays(date, -idx)
 }
 
+export function addMinutesToTime(time, minutes) {
+  if (!time) return time
+  const [h, m] = time.slice(0, 5).split(':').map(Number)
+  const total = h * 60 + m + Number(minutes || 0)
+  const hh = String(Math.floor(((total % 1440) + 1440) % 1440 / 60)).padStart(2, '0')
+  const mm = String(((total % 60) + 60) % 60).padStart(2, '0')
+  return `${hh}:${mm}`
+}
+
 export function timeSlots(startTime, endTime, stepMinutes = 60) {
   const slots = []
   if (!startTime || !endTime) return slots

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { formatMoney, waLink, fillTemplate, groupSizeLabel, jsDayToIdx, categoryLabel } from '../lib/helpers'
+import { formatMoney, waLink, fillTemplate, groupSizeLabel, jsDayToIdx, categoryLabel, addMinutesToTime } from '../lib/helpers'
 import { CloseIcon, WhatsAppIcon, PlusIcon, WarningIcon } from './Icons'
 
 function sizeKeyFor(count) {
@@ -63,11 +63,15 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
     ? students.filter((s) => !assignedIds.has(s.id) && s.name.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 5)
     : []
 
-  // Recalcula precio/comisión de todas las filas cuando cambia la cantidad de gente en el hueco
+  // Recalcula precio/comisión de todas las filas cuando cambia la cantidad de gente en el hueco.
+  // La comisión al club es un monto fijo POR CLASE (no por alumno), así que si hay varios
+  // alumnos en el mismo hueco la repartimos entre todos para que la suma de las filas dé el
+  // total real de la clase (y no lo multiplique por la cantidad de alumnos en Caja/Estadísticas).
   async function repriceAll(nextRows) {
     const size = sizeKeyFor(nextRows.length)
     const price = priceFor(size)
-    const commission = commissionFor(size)
+    const commissionTotal = commissionFor(size)
+    const commission = nextRows.length > 0 ? commissionTotal / nextRows.length : 0
     await Promise.all(
       nextRows.map((r) => supabase.from('classes').update({ price, commission }).eq('id', r.id)),
     )
@@ -75,7 +79,9 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
   }
 
   async function insertClass(student) {
-    const size = sizeKeyFor(rows.length + 1)
+    const nextCount = rows.length + 1
+    const size = sizeKeyFor(nextCount)
+    const durationMinutes = profile?.class_duration_minutes || 60
     const { data } = await supabase
       .from('classes')
       .insert({
@@ -83,9 +89,10 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
         student_id: student.id,
         class_date: slot.iso,
         start_time: slot.time,
+        end_time: addMinutesToTime(slot.time, durationMinutes),
         status: 'scheduled',
         price: priceFor(size),
-        commission: commissionFor(size),
+        commission: commissionFor(size) / nextCount,
       })
       .select('*, students(id, name, phone, category, category_level)')
       .single()
@@ -184,6 +191,7 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
         student_id: newStudent.id,
         class_date: slot.iso,
         start_time: slot.time,
+        end_time: row.end_time || addMinutesToTime(slot.time, profile?.class_duration_minutes || 60),
         status: 'scheduled',
         price: row.price,
         commission: row.commission,

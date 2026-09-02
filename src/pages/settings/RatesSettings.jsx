@@ -5,10 +5,10 @@ import { CURRENCIES } from '../../lib/helpers'
 import Header from '../../components/Header'
 
 const ROWS = [
-  { key: 'individual', label: 'Individual' },
-  { key: 'duo', label: 'Dúo (c/u)' },
-  { key: 'trio', label: 'Trío (c/u)' },
-  { key: 'group4', label: 'Grupo de 4 (c/u)' },
+  { key: 'individual', label: 'Individual', count: 1 },
+  { key: 'duo', label: 'Dúo (c/u)', count: 2 },
+  { key: 'trio', label: 'Trío (c/u)', count: 3 },
+  { key: 'group4', label: 'Grupo de 4 (c/u)', count: 4 },
 ]
 const ALL_FIELDS = ['individual_price', 'duo_price', 'trio_price', 'group4_price', 'monthly_price', 'individual_commission', 'duo_commission', 'trio_commission', 'group4_commission', 'monthly_commission']
 const EMPTY_PRICES = Object.fromEntries(ALL_FIELDS.map((f) => [f, 0]))
@@ -107,6 +107,7 @@ export default function RatesSettings() {
           <PriceCommissionRow
             key={r.key}
             label={r.label}
+            count={r.count}
             price={active[`${r.key}_price`]}
             commission={active[`${r.key}_commission`]}
             onPriceChange={(v) => update(`${r.key}_price`, v)}
@@ -119,6 +120,7 @@ export default function RatesSettings() {
         <div className="label-muted mb-1 mt-4">Tarifa mensual (para alumnos que pagan por mes)</div>
         <PriceCommissionRow
           label="Por mes, venga las veces que venga"
+          count={1}
           price={active.monthly_price}
           commission={active.monthly_commission}
           onPriceChange={(v) => update('monthly_price', v)}
@@ -135,8 +137,9 @@ export default function RatesSettings() {
   )
 }
 
-function PriceCommissionRow({ label, price, commission, onPriceChange, onCommissionChange, currency, last }) {
-  const neto = (Number(price) || 0) - (Number(commission) || 0)
+function PriceCommissionRow({ label, count = 1, price, commission, onPriceChange, onCommissionChange, currency, last }) {
+  const total = (Number(price) || 0) * count
+  const neto = total - (Number(commission) || 0)
   return (
     <div className={`py-3 ${!last ? 'border-b border-bg-border' : ''}`}>
       <div className="text-sm font-medium mb-2">{label}</div>
@@ -146,6 +149,9 @@ function PriceCommissionRow({ label, price, commission, onPriceChange, onCommiss
       </div>
       {Number(price) > 0 && (
         <div className="text-[11px] text-slate-500 mt-1.5">
+          {count > 1 && (
+            <>Clase completa <span className="text-slate-300 font-semibold">${total.toLocaleString('es-AR')} {currency}</span> ({count} x ${Number(price).toLocaleString('es-AR')}) · </>
+          )}
           Te queda <span className="text-brand font-semibold">${neto.toLocaleString('es-AR')} {currency}</span> por clase
         </div>
       )}

@@ -5,13 +5,16 @@ import { DAY_NAMES, DAY_NAMES_FULL, timeSlots } from '../../lib/helpers'
 import Header from '../../components/Header'
 import { ChevronRight, PlusIcon, CloseIcon, CheckCircleIcon } from '../../components/Icons'
 
+const DURATIONS = [30, 45, 60, 90, 120]
+
 export default function ScheduleSettings() {
-  const { user } = useAuth()
+  const { user, profile, refreshProfile } = useAuth()
   const [workingDays, setWorkingDays] = useState({}) // {0: true, ...}
   const [defaultTimes, setDefaultTimes] = useState([]) // ['08:00', '09:30', ...]
   const [customByDay, setCustomByDay] = useState({}) // {dayIdx: ['08:00', ...]}
   const [editingDay, setEditingDay] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [savingDuration, setSavingDuration] = useState(false)
 
   async function load() {
     if (!user) return
@@ -41,6 +44,13 @@ export default function ScheduleSettings() {
 
   function toggleDay(idx) {
     setWorkingDays((w) => ({ ...w, [idx]: !w[idx] }))
+  }
+
+  async function setDuration(minutes) {
+    setSavingDuration(true)
+    await supabase.from('profiles').update({ class_duration_minutes: minutes }).eq('id', user.id)
+    await refreshProfile()
+    setSavingDuration(false)
   }
 
   async function saveAll() {
@@ -86,6 +96,31 @@ export default function ScheduleSettings() {
               >
                 {active && <CheckCircleIcon size={13} className="absolute -top-1.5 -right-1.5 bg-bg-panel rounded-full text-brand" />}
                 {d}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="card p-4 mb-3">
+        <div className="label-muted mb-1">Duración de cada clase</div>
+        <p className="text-xs text-slate-500 mb-3">
+          Mientras dure una clase, ese rango queda ocupado y no vas a poder sumar otra por separado en los huecos intermedios.
+        </p>
+        <div className="grid grid-cols-5 gap-1.5">
+          {DURATIONS.map((m) => {
+            const active = (profile?.class_duration_minutes || 60) === m
+            return (
+              <button
+                key={m}
+                type="button"
+                disabled={savingDuration}
+                onClick={() => setDuration(m)}
+                className={`py-2 rounded-full text-xs font-semibold transition ${
+                  active ? 'bg-brand text-slate-900 shadow-md shadow-brand/30 ring-2 ring-brand' : 'bg-bg-card text-slate-400 border border-bg-border hover:border-brand/40'
+                }`}
+              >
+                {m} min
               </button>
             )
           })}
