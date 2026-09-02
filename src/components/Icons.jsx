@@ -86,6 +86,12 @@ export const ChevronDown = (p) => (
     <path d="M5 9l7 7 7-7" />
   </svg>
 )
+export const LockIcon = (p) => (
+  <svg viewBox="0 0 24 24" width={p.size || 20} height={p.size || 20} {...base} className={p.className}>
+    <rect x="5" y="11" width="14" height="9" rx="2" />
+    <path d="M8 11V7a4 4 0 018 0v4" />
+  </svg>
+)
 export const TrophyIcon = (p) => (
   <svg viewBox="0 0 24 24" width={p.size || 20} height={p.size || 20} {...base} className={p.className}>
     <path d="M7 4h10v4a5 5 0 01-10 0V4z" />

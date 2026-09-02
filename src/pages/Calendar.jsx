@@ -29,10 +29,10 @@ function computeHoursForDay(dayIdx, workingDays, slots) {
   return [...set].sort()
 }
 
-// Cada clase ocupa su horario de inicio + la duración configurada (end_time), así que un hueco
-// que cae DENTRO de una clase que ya empezó en un horario anterior no puede reservarse aparte:
-// se muestra ocupado por esa misma clase, en vez de "Libre".
-function buildOccupancy(hours, classes, defaultDuration) {
+// Cada clase (o bloqueo manual) ocupa su horario de inicio + la duración configurada
+// (end_time), así que un hueco que cae DENTRO de una clase o un bloqueo que ya empezó en
+// un horario anterior no puede reservarse aparte: se muestra ocupado, en vez de "Libre".
+function buildOccupancy(hours, classes, blocks, defaultDuration) {
   const byTime = {}
   classes.forEach((c) => {
     const key = c.start_time?.slice(0, 5)
@@ -40,15 +40,35 @@ function buildOccupancy(hours, classes, defaultDuration) {
     if (!byTime[key]) byTime[key] = []
     byTime[key].push(c)
   })
+  const blockByTime = {}
+  ;(blocks || []).forEach((b) => {
+    const key = b.start_time?.slice(0, 5)
+    if (!key) return
+    blockByTime[key] = b
+  })
+
+  function endOf(item) {
+    const s = item.start_time?.slice(0, 5)
+    return item.end_time ? item.end_time.slice(0, 5) : addMinutesToTime(s, defaultDuration)
+  }
+
   return hours.map((h) => {
-    if (byTime[h]) return { time: h, own: byTime[h], coveredBy: null }
+    if (blockByTime[h]) return { time: h, own: null, ownBlock: blockByTime[h], coveredBy: null, coveredByBlock: null }
+    if (byTime[h]) return { time: h, own: byTime[h], ownBlock: null, coveredBy: null, coveredByBlock: null }
+
+    const coveredByBlock = (blocks || []).find((b) => {
+      const s = b.start_time?.slice(0, 5)
+      if (!s) return false
+      return s < h && h < endOf(b)
+    })
+    if (coveredByBlock) return { time: h, own: null, ownBlock: null, coveredBy: null, coveredByBlock }
+
     const coveredBy = classes.find((c) => {
       const s = c.start_time?.slice(0, 5)
       if (!s) return false
-      const e = (c.end_time ? c.end_time.slice(0, 5) : addMinutesToTime(s, defaultDuration))
-      return s < h && h < e
+      return s < h && h < endOf(c)
     })
-    return { time: h, own: null, coveredBy: coveredBy || null }
+    return { time: h, own: null, ownBlock: null, coveredBy: coveredBy || null, coveredByBlock: null }
   })
 }
 
@@ -60,6 +80,7 @@ export default function Calendar() {
   const [workingDays, setWorkingDays] = useState([])
   const [slots, setSlots] = useState([])
   const [classesMap, setClassesMap] = useState({}) // iso -> [{...class, students:{name}}]
+  const [blocksMap, setBlocksMap] = useState({}) // iso -> [{...schedule_blocks row}]
   const [loading, setLoading] = useState(true)
   const [activeSlot, setActiveSlot] = useState(null) // { iso, dayIdx, time, existingClass }
   const [showHint, setShowHint] = useState(true)
@@ -77,18 +98,32 @@ export default function Calendar() {
   const loadClasses = useCallback(
     async (fromDate, toDate) => {
       if (!user) return
-      const { data } = await supabase
-        .from('classes')
-        .select('*, students(id, name, phone, category, category_level)')
-        .eq('profesor_id', user.id)
-        .gte('class_date', toISODate(fromDate))
-        .lte('class_date', toISODate(toDate))
+      const [{ data }, { data: blockData }] = await Promise.all([
+        supabase
+          .from('classes')
+          .select('*, students(id, name, phone, category, category_level)')
+          .eq('profesor_id', user.id)
+          .gte('class_date', toISODate(fromDate))
+          .lte('class_date', toISODate(toDate)),
+        supabase
+          .from('schedule_blocks')
+          .select('*')
+          .eq('profesor_id', user.id)
+          .gte('block_date', toISODate(fromDate))
+          .lte('block_date', toISODate(toDate)),
+      ])
       const map = {}
       ;(data || []).forEach((c) => {
         if (!map[c.class_date]) map[c.class_date] = []
         map[c.class_date].push(c)
       })
       setClassesMap(map)
+      const bmap = {}
+      ;(blockData || []).forEach((b) => {
+        if (!bmap[b.block_date]) bmap[b.block_date] = []
+        bmap[b.block_date].push(b)
+      })
+      setBlocksMap(bmap)
     },
     [user],
   )
@@ -149,7 +184,7 @@ export default function Calendar() {
 
       {view === 'dia' && showHint && (
         <div className="rounded-xl bg-brand/10 border border-brand/30 text-brand text-xs p-3 mb-4 flex items-start justify-between gap-2">
-          <span>Acá se edita todo. Tocá un hueco y decime quién viene — el alumno se crea rápido y fácil, con nombre y categoría.</span>
+          <span>Acá se edita todo. Tocá un hueco y decime quién viene, o bloqueálo si tenés que faltar por algún motivo.</span>
           <button onClick={() => setShowHint(false)}><CloseIcon size={14} /></button>
         </div>
       )}
@@ -173,10 +208,11 @@ export default function Calendar() {
           workingDays={workingDays}
           slots={slots}
           classes={classesMap[toISODate(cursor)] || []}
+          blocks={blocksMap[toISODate(cursor)] || []}
           loading={loading}
           defaultDuration={profile?.class_duration_minutes || 60}
-          onSlotClick={(time, existingClasses) =>
-            setActiveSlot({ iso: toISODate(cursor), time, dayIdx: jsDayToIdx(cursor.getDay()), existingClasses })
+          onSlotClick={(time, existingClasses, block) =>
+            setActiveSlot({ iso: toISODate(cursor), time, dayIdx: jsDayToIdx(cursor.getDay()), existingClasses, block })
           }
         />
       )}
@@ -187,6 +223,7 @@ export default function Calendar() {
           workingDays={workingDays}
           slots={slots}
           classesMap={classesMap}
+          blocksMap={blocksMap}
           defaultDuration={profile?.class_duration_minutes || 60}
           onSelectDay={(d) => {
             setCursor(d)
@@ -221,11 +258,11 @@ export default function Calendar() {
   )
 }
 
-function DayView({ date, workingDays, slots, classes, loading, defaultDuration, onSlotClick }) {
+function DayView({ date, workingDays, slots, classes, blocks, loading, defaultDuration, onSlotClick }) {
   const dayIdx = jsDayToIdx(date.getDay())
   const hours = computeHoursForDay(dayIdx, workingDays, slots)
-  const occupancy = buildOccupancy(hours, classes, defaultDuration)
-  const freeCount = occupancy.filter((o) => !o.own && !o.coveredBy).length
+  const occupancy = buildOccupancy(hours, classes, blocks, defaultDuration)
+  const freeCount = occupancy.filter((o) => !o.own && !o.ownBlock && !o.coveredBy && !o.coveredByBlock).length
 
   if (!loading && hours.length === 0) {
     return (
@@ -243,9 +280,45 @@ function DayView({ date, workingDays, slots, classes, loading, defaultDuration, 
         ¿Este día trabajás distinto? Ajustar solo este día
       </a>
       <div className="card divide-y divide-bg-border mt-3">
-        {occupancy.map(({ time: h, own, coveredBy }) => {
+        {occupancy.map(({ time: h, own, ownBlock, coveredBy, coveredByBlock }) => {
           const list = own || []
           const allPaid = list.length > 0 && list.every((c) => c.paid)
+
+          if (ownBlock) {
+            return (
+              <button
+                key={h}
+                onClick={() => onSlotClick(h, [], ownBlock)}
+                className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-white/5 transition"
+              >
+                <span className="text-slate-300 font-medium">{h}</span>
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className="text-slate-400 text-sm truncate">{ownBlock.reason || 'Bloqueado'}</span>
+                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full shrink-0 bg-slate-500/20 text-slate-400">🔒 Bloqueado</span>
+                </span>
+              </button>
+            )
+          }
+
+          if (coveredByBlock) {
+            const startTime = coveredByBlock.start_time?.slice(0, 5)
+            return (
+              <button
+                key={h}
+                onClick={() => onSlotClick(startTime, [], coveredByBlock)}
+                className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-white/5 transition"
+              >
+                <span className="text-slate-500 font-medium">{h}</span>
+                <span className="text-slate-500 text-sm flex items-center gap-1.5">
+                  🔒 Bloqueado
+                  <span className="text-[10px] font-bold uppercase bg-bg-card border border-bg-border px-1.5 py-0.5 rounded-full text-slate-400">
+                    desde {startTime}
+                  </span>
+                </span>
+              </button>
+            )
+          }
+
           if (coveredBy) {
             const startTime = coveredBy.start_time?.slice(0, 5)
             return (
@@ -264,6 +337,7 @@ function DayView({ date, workingDays, slots, classes, loading, defaultDuration, 
               </button>
             )
           }
+
           return (
             <button
               key={h}
@@ -297,7 +371,7 @@ function DayView({ date, workingDays, slots, classes, loading, defaultDuration, 
   )
 }
 
-function WeekView({ cursor, workingDays, slots, classesMap, defaultDuration, onSelectDay }) {
+function WeekView({ cursor, workingDays, slots, classesMap, blocksMap, defaultDuration, onSelectDay }) {
   const from = startOfWeek(cursor)
   const days = Array.from({ length: 7 }, (_, i) => addDays(from, i))
   const today = toISODate(new Date())
@@ -309,8 +383,9 @@ function WeekView({ cursor, workingDays, slots, classesMap, defaultDuration, onS
         const dayIdx = jsDayToIdx(d.getDay())
         const hours = computeHoursForDay(dayIdx, workingDays, slots)
         const dayClasses = classesMap[iso] || []
-        const occupancy = buildOccupancy(hours, dayClasses, defaultDuration)
-        const freeHuecos = occupancy.filter((o) => !o.own && !o.coveredBy).length
+        const dayBlocks = blocksMap[iso] || []
+        const occupancy = buildOccupancy(hours, dayClasses, dayBlocks, defaultDuration)
+        const freeHuecos = occupancy.filter((o) => !o.own && !o.ownBlock && !o.coveredBy && !o.coveredByBlock).length
         const isToday = iso === today
         return (
           <button

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatMoney, waLink, fillTemplate, groupSizeLabel, jsDayToIdx, categoryLabel, addMinutesToTime } from '../lib/helpers'
-import { CloseIcon, WhatsAppIcon, PlusIcon, WarningIcon } from './Icons'
+import { CloseIcon, WhatsAppIcon, PlusIcon, WarningIcon, LockIcon } from './Icons'
 
 function sizeKeyFor(count) {
   if (count <= 1) return 'individual'
@@ -24,6 +24,9 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
   const [swapForId, setSwapForId] = useState(null)
   const [editingPriceId, setEditingPriceId] = useState(null)
   const [priceDraft, setPriceDraft] = useState('')
+  const [showBlockForm, setShowBlockForm] = useState(false)
+  const [blockReason, setBlockReason] = useState('')
+  const [blockSaving, setBlockSaving] = useState(false)
 
   const dayIdx = slot.dayIdx ?? jsDayToIdx(new Date(slot.iso + 'T12:00:00').getDay())
 
@@ -203,6 +206,27 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
     setSaving(false)
   }
 
+  async function blockSlot() {
+    setBlockSaving(true)
+    const durationMinutes = profile?.class_duration_minutes || 60
+    await supabase.from('schedule_blocks').insert({
+      profesor_id: user.id,
+      block_date: slot.iso,
+      start_time: slot.time,
+      end_time: addMinutesToTime(slot.time, durationMinutes),
+      reason: blockReason.trim() || null,
+    })
+    setBlockSaving(false)
+    onSaved()
+  }
+
+  async function unblockSlot() {
+    setBlockSaving(true)
+    await supabase.from('schedule_blocks').delete().eq('id', slot.block.id)
+    setBlockSaving(false)
+    onSaved()
+  }
+
   async function removeWholeSlot() {
     if (!confirm('¿Quitar esta clase? Se van a desasignar todos los alumnos de este horario.')) return
     setSaving(true)
@@ -212,6 +236,36 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
   }
 
   const sizeLabel = rows.length > 0 ? groupSizeLabel(sizeKeyFor(rows.length)) : null
+
+  if (slot.block) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+        <div className="card w-full sm:max-w-md rounded-b-none sm:rounded-2xl p-5 fade-in" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="font-bold flex items-center gap-2">
+              <LockIcon size={18} className="text-slate-400" />
+              Horario bloqueado
+            </div>
+            <button onClick={onClose} className="text-slate-400"><CloseIcon /></button>
+          </div>
+
+          <div className="card p-4 mb-4 bg-bg-card">
+            <div className="text-sm font-semibold mb-1">{slot.time} hs</div>
+            <div className="text-sm text-slate-400">{slot.block.reason || 'Sin motivo especificado.'}</div>
+          </div>
+
+          <p className="text-xs text-slate-500 mb-4">Mientras esté bloqueado, nadie va a poder reservar clase en este horario.</p>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={onClose} className="btn-secondary">Cerrar</button>
+            <button onClick={unblockSlot} disabled={blockSaving} className="btn-primary bg-red-500 hover:bg-red-600">
+              {blockSaving ? 'Un momento...' : 'Desbloquear'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
@@ -247,7 +301,34 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
           )}
         </div>
 
-        {rows.length === 0 && <div className="text-sm text-slate-500 text-center py-6">Todavía nadie asignado a este hueco.</div>}
+        {rows.length === 0 && !showBlockForm && (
+          <div className="text-center py-4">
+            <div className="text-sm text-slate-500 mb-3">Todavía nadie asignado a este hueco.</div>
+            <button onClick={() => setShowBlockForm(true)} className="text-slate-400 text-xs font-semibold inline-flex items-center gap-1.5 hover:text-slate-300">
+              <LockIcon size={13} /> Bloquear este horario (trámite, ausencia, etc.)
+            </button>
+          </div>
+        )}
+
+        {rows.length === 0 && showBlockForm && (
+          <div className="card p-3 mb-4 bg-bg-card">
+            <div className="text-sm font-semibold mb-2 flex items-center gap-1.5"><LockIcon size={14} className="text-slate-400" /> Bloquear las {slot.time} hs</div>
+            <input
+              autoFocus
+              className="input mb-2"
+              placeholder="Motivo (opcional): trámite, médico..."
+              value={blockReason}
+              onChange={(e) => setBlockReason(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && blockSlot()}
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => setShowBlockForm(false)} className="btn-secondary">Cancelar</button>
+              <button onClick={blockSlot} disabled={blockSaving} className="btn-primary">
+                {blockSaving ? 'Bloqueando...' : 'Confirmar bloqueo'}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-3">
           {rows.map((row) => (
