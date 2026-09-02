@@ -110,14 +110,30 @@ function StudentProfile({ student, onClose, onEdit, onChanged }) {
   async function toggleBaja() {
     setBusy(true)
     const nextStatus = student.status === 'baja' ? 'active' : 'baja'
-    if (nextStatus === 'baja' && !confirm(`¿Dar de baja a ${student.name}? Podés reactivarlo cuando quieras, no se pierde nada.`)) {
+    if (nextStatus === 'baja' && !confirm(`¿Dar de baja a ${student.name}? Se elimina solo a los 7 días si no lo reactivás antes.`)) {
       setBusy(false)
       return
     }
-    await supabase.from('students').update({ status: nextStatus }).eq('id', student.id)
+    await supabase
+      .from('students')
+      .update({ status: nextStatus, baja_at: nextStatus === 'baja' ? new Date().toISOString() : null })
+      .eq('id', student.id)
     setBusy(false)
     onChanged()
   }
+
+  async function deleteNow() {
+    if (!confirm(`Esto borra a ${student.name} para siempre, con todo su historial de clases y pagos. No se puede deshacer. ¿Confirmás?`)) return
+    setBusy(true)
+    await supabase.from('students').delete().eq('id', student.id)
+    setBusy(false)
+    onChanged()
+  }
+
+  const daysUntilDelete =
+    student.status === 'baja' && student.baja_at
+      ? Math.max(0, 7 - Math.floor((Date.now() - new Date(student.baja_at).getTime()) / 86400000))
+      : null
 
   const memberSince = student.created_at
     ? new Date(student.created_at).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
@@ -240,13 +256,28 @@ function StudentProfile({ student, onClose, onEdit, onChanged }) {
         )}
       </div>
 
+      {student.status === 'baja' && (
+        <div className="text-xs text-slate-500 text-center mt-4">
+          {daysUntilDelete === 0
+            ? 'Se elimina automáticamente hoy si no lo reactivás.'
+            : `Si no hacés nada, se elimina solo en ${daysUntilDelete} día${daysUntilDelete === 1 ? '' : 's'}.`}
+        </div>
+      )}
+
       <button
         onClick={toggleBaja}
         disabled={busy}
-        className={`w-full text-center font-semibold py-3 rounded-xl mt-4 ${student.status === 'baja' ? 'bg-brand/10 text-brand' : 'bg-red-500/10 text-red-400'}`}
+        className={`w-full text-center font-semibold py-3 rounded-xl mt-2 ${student.status === 'baja' ? 'bg-brand/10 text-brand' : 'bg-red-500/10 text-red-400'}`}
       >
         {student.status === 'baja' ? 'Reactivar alumno' : 'Dar de baja'}
       </button>
+
+      {student.status === 'baja' && (
+        <button onClick={deleteNow} disabled={busy} className="w-full text-center font-semibold py-3 rounded-xl mt-2 bg-red-500/10 text-red-400">
+          Eliminar ahora, para siempre
+        </button>
+      )}
+
       <button onClick={onClose} className="w-full text-center text-sm text-slate-400 font-semibold py-2.5 underline decoration-dotted">
         Cerrar
       </button>

@@ -122,7 +122,11 @@ export default function Students() {
               <span className="text-[10px] font-bold uppercase bg-amber-500/20 text-amber-400 px-2 py-1 rounded-full shrink-0">Enfriándose</span>
             )}
             {s.status === 'baja' && (
-              <span className="text-[10px] font-bold uppercase bg-red-500/20 text-red-400 px-2 py-1 rounded-full shrink-0">Baja</span>
+              <span className="text-[10px] font-bold uppercase bg-red-500/20 text-red-400 px-2 py-1 rounded-full shrink-0 text-center leading-tight">
+                {s.baja_at
+                  ? `Se borra en ${Math.max(0, 7 - Math.floor((Date.now() - new Date(s.baja_at).getTime()) / 86400000))}d`
+                  : 'Baja'}
+              </span>
             )}
           </button>
         ))}
