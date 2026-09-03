@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { formatMoney, monthLabel, toISODate, waLink, fillTemplate } from '../lib/helpers'
+import { formatMoney, monthLabel, toISODate, waLink, fillTemplate, sizeKeyFor, groupSizeLabel } from '../lib/helpers'
 import Header from '../components/Header'
-import { ChevronLeft, ChevronRight, ChevronRight as Chev, WhatsAppIcon, PlusIcon, CloseIcon } from '../components/Icons'
+import { ChevronLeft, ChevronRight, ChevronRight as Chev, WhatsAppIcon, PlusIcon, CloseIcon, CheckCircleIcon } from '../components/Icons'
 
 export default function Caja() {
   const { user, profile } = useAuth()
@@ -15,6 +15,8 @@ export default function Caja() {
   const [loading, setLoading] = useState(true)
   const [openSection, setOpenSection] = useState(null) // 'debe' | 'pagaron' | 'gastos'
   const [showExpenseForm, setShowExpenseForm] = useState(false)
+  const [expandedDebtId, setExpandedDebtId] = useState(null)
+  const [payingId, setPayingId] = useState(null)
 
   const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
   const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0)
@@ -53,15 +55,30 @@ export default function Caja() {
 
   const todayISO = toISODate(new Date())
 
+  // Para mostrar "Individual/Dúo/Trío..." en el detalle: cuántos alumnos activos comparten
+  // ese mismo día y horario (dentro de las clases ya cargadas del mes).
+  const sizeByDateTime = useMemo(() => {
+    const counts = {}
+    classes.forEach((c) => {
+      const key = `${c.class_date}_${c.start_time}`
+      counts[key] = (counts[key] || 0) + 1
+    })
+    return counts
+  }, [classes])
+
   const debtByStudent = useMemo(() => {
     const map = {}
-    classes.filter((c) => !c.paid && c.class_date <= todayISO).forEach((c) => {
-      const id = c.student_id
-      if (!map[id]) map[id] = { student: c.students, total: 0 }
-      map[id].total += Number(c.price || 0)
-    })
+    classes
+      .filter((c) => !c.paid && c.class_date <= todayISO)
+      .sort((a, b) => (a.class_date + (a.start_time || '')).localeCompare(b.class_date + (b.start_time || '')))
+      .forEach((c) => {
+        const id = c.student_id
+        if (!map[id]) map[id] = { student: c.students, total: 0, classes: [] }
+        map[id].total += Number(c.price || 0)
+        map[id].classes.push(c)
+      })
     return Object.values(map)
-  }, [classes])
+  }, [classes, todayISO])
 
   const paidByStudent = useMemo(() => {
     const map = {}
@@ -77,6 +94,19 @@ export default function Caja() {
   const totalPagaron = paidByStudent.reduce((s, d) => s + d.total, 0)
 
   const isCurrentMonth = monthLabel(cursor) === monthLabel(new Date())
+
+  async function markClassPaid(classId) {
+    setPayingId(classId)
+    await supabase.from('classes').update({ paid: true }).eq('id', classId)
+    setClasses((prev) => prev.map((c) => (c.id === classId ? { ...c, paid: true } : c)))
+    setPayingId(null)
+  }
+
+  function formatClassDate(iso) {
+    const d = new Date(`${iso}T00:00:00`)
+    const text = d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'numeric' })
+    return text.charAt(0).toUpperCase() + text.slice(1)
+  }
 
   return (
     <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 fade-in">
@@ -128,20 +158,61 @@ export default function Caja() {
 
       {openSection === 'debe' && (
         <div className="card divide-y divide-bg-border mb-2.5">
-          {debtByStudent.length === 0 && <div className="p-4 text-sm text-slate-500 text-center">Nadie te debe este mes.</div>}
-          {debtByStudent.map((d) => (
-            <div key={d.student?.id} className="p-3.5 flex items-center justify-between">
-              <div>
-                <div className="font-semibold text-sm">{d.student?.name}</div>
-                <div className="text-xs text-slate-400">{formatMoney(d.total, profile?.currency)}</div>
+          {debtByStudent.length === 0 && <div className="p-4 text-sm text-slate-500 text-center">Nadie te debe hasta hoy.</div>}
+          {debtByStudent.map((d) => {
+            const isOpen = expandedDebtId === d.student?.id
+            return (
+              <div key={d.student?.id}>
+                <button
+                  onClick={() => setExpandedDebtId(isOpen ? null : d.student?.id)}
+                  className="w-full p-3.5 flex items-center justify-between text-left"
+                >
+                  <div>
+                    <div className="font-semibold text-sm">{d.student?.name}</div>
+                    <div className="text-xs text-slate-400">
+                      {d.classes.length} clase{d.classes.length === 1 ? '' : 's'} sin pagar · {formatMoney(d.total, profile?.currency)}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {d.student?.phone && (
+                      <a
+                        href={waLink(d.student.phone, fillTemplate(templates.deuda || '', { nombre: d.student.name, monto: d.total }))}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="btn-secondary flex items-center gap-1 text-amber-400 text-xs"
+                      >
+                        <WhatsAppIcon size={14} /> Avisar
+                      </a>
+                    )}
+                    <Chev className={`text-slate-500 transition ${isOpen ? 'rotate-90' : ''}`} size={14} />
+                  </div>
+                </button>
+                {isOpen && (
+                  <div className="px-3.5 pb-3.5 space-y-1.5">
+                    {d.classes.map((c) => {
+                      const size = sizeKeyFor(sizeByDateTime[`${c.class_date}_${c.start_time}`] || 1)
+                      return (
+                        <div key={c.id} className="rounded-xl bg-bg-card border border-bg-border px-3 py-2 flex items-center justify-between gap-2">
+                          <div className="text-xs text-slate-300 min-w-0">
+                            <span className="font-semibold">{formatClassDate(c.class_date)} · {c.start_time?.slice(0, 5)}</span>
+                            <span className="text-slate-500"> — {groupSizeLabel(size)} — {formatMoney(c.price, profile?.currency)}</span>
+                          </div>
+                          <button
+                            onClick={() => markClassPaid(c.id)}
+                            disabled={payingId === c.id}
+                            className="shrink-0 flex items-center gap-1 text-[11px] font-bold text-brand bg-brand/10 rounded-full px-2.5 py-1"
+                          >
+                            <CheckCircleIcon size={12} /> Pagó
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
-              {d.student?.phone && (
-                <a href={waLink(d.student.phone, fillTemplate(templates.deuda || '', { nombre: d.student.name, monto: d.total }))} target="_blank" rel="noreferrer" className="btn-secondary flex items-center gap-1 text-amber-400 text-xs">
-                  <WhatsAppIcon size={14} /> Avisar
-                </a>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
