@@ -98,6 +98,10 @@ export default function SettingsHome() {
         actionLabel={profile?.unlimited_access ? 'Ver' : profile?.plan ? 'Cambiar' : 'Elegir plan'}
       />
 
+      {profile?.unlimited_access && (
+        <SettingsLink to="/admin" title="Profes registrados" desc="Quiénes se registraron en ProfePadel y en qué estado de acceso están (prueba, plan activo, vencido)." actionLabel="Ver" />
+      )}
+
       <Section title="Soporte">
         <div className="font-semibold text-sm">Contactanos</div>
         <a href="mailto:leandro.santagada@icloud.com" className="text-xs text-slate-400">leandro.santagada@icloud.com</a>

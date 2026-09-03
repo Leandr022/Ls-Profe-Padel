@@ -18,6 +18,7 @@ import NotificationsSettings from './pages/settings/NotificationsSettings'
 import MessagesSettings from './pages/settings/MessagesSettings'
 import DebtSettings from './pages/settings/DebtSettings'
 import PlanSettings from './pages/settings/PlanSettings'
+import Admin from './pages/Admin'
 
 function useThemeSync() {
   const { profile } = useAuth()
@@ -64,6 +65,12 @@ function ProtectedRoute({ children }) {
   )
 }
 
+function AdminRoute({ children }) {
+  const { profile } = useAuth()
+  if (!profile?.unlimited_access) return <Navigate to="/configuracion" replace />
+  return children
+}
+
 export default function App() {
   useThemeSync()
   const { session, loading } = useAuth()
@@ -86,6 +93,7 @@ export default function App() {
       <Route path="/configuracion/mensajes" element={<ProtectedRoute><MessagesSettings /></ProtectedRoute>} />
       <Route path="/configuracion/deuda" element={<ProtectedRoute><DebtSettings /></ProtectedRoute>} />
       <Route path="/configuracion/plan" element={<ProtectedRoute><PlanSettings /></ProtectedRoute>} />
+      <Route path="/admin" element={<ProtectedRoute><AdminRoute><Admin /></AdminRoute></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
