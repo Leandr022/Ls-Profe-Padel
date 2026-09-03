@@ -48,12 +48,17 @@ export default function Caja() {
     load()
   }, [user, cursor])
 
-  const totalFacturado = classes.reduce((s, c) => s + Number(c.price || 0), 0)
-  const totalComision = classes.reduce((s, c) => s + Number(c.commission || 0), 0)
+  const todayISO = toISODate(new Date())
+
+  // Todas las cuentas de plata (facturado, comisión, quién debe, quién pagó) sólo toman en
+  // cuenta clases que ya pasaron (hasta hoy inclusive) — una clase agendada para mañana o la
+  // semana que viene todavía no es plata "real" para el mes.
+  const classesUpToToday = useMemo(() => classes.filter((c) => c.class_date <= todayISO), [classes, todayISO])
+
+  const totalFacturado = classesUpToToday.reduce((s, c) => s + Number(c.price || 0), 0)
+  const totalComision = classesUpToToday.reduce((s, c) => s + Number(c.commission || 0), 0)
   const totalGastos = expenses.reduce((s, e) => s + Number(e.amount || 0), 0)
   const totalNeto = totalFacturado - totalComision - totalGastos
-
-  const todayISO = toISODate(new Date())
 
   // Para mostrar "Individual/Dúo/Trío..." en el detalle: cuántos alumnos activos comparten
   // ese mismo día y horario (dentro de las clases ya cargadas del mes).
@@ -68,8 +73,8 @@ export default function Caja() {
 
   const debtByStudent = useMemo(() => {
     const map = {}
-    classes
-      .filter((c) => !c.paid && c.class_date <= todayISO)
+    classesUpToToday
+      .filter((c) => !c.paid)
       .sort((a, b) => (a.class_date + (a.start_time || '')).localeCompare(b.class_date + (b.start_time || '')))
       .forEach((c) => {
         const id = c.student_id
@@ -78,17 +83,17 @@ export default function Caja() {
         map[id].classes.push(c)
       })
     return Object.values(map)
-  }, [classes, todayISO])
+  }, [classesUpToToday])
 
   const paidByStudent = useMemo(() => {
     const map = {}
-    classes.filter((c) => c.paid).forEach((c) => {
+    classesUpToToday.filter((c) => c.paid).forEach((c) => {
       const id = c.student_id
       if (!map[id]) map[id] = { student: c.students, total: 0 }
       map[id].total += Number(c.price || 0)
     })
     return Object.values(map)
-  }, [classes])
+  }, [classesUpToToday])
 
   const totalDebe = debtByStudent.reduce((s, d) => s + d.total, 0)
   const totalPagaron = paidByStudent.reduce((s, d) => s + d.total, 0)
@@ -122,7 +127,7 @@ export default function Caja() {
         <div className="label-muted mb-1">Total facturado</div>
         <div className="text-3xl font-extrabold">{loading ? '–' : formatMoney(totalFacturado, profile?.currency)}</div>
         <div className="text-xs text-slate-500 mt-1">
-          {isCurrentMonth ? 'Clases cargadas este mes' : `Clases de ${monthLabel(cursor)}`}
+          {isCurrentMonth ? 'Clases dadas este mes, hasta hoy' : `Clases de ${monthLabel(cursor)}`}
         </div>
         {totalComision > 0 && (
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-bg-border text-sm">
