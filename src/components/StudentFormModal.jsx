@@ -378,8 +378,12 @@ function StudentEditForm({ student, onClose, onSaved, onCancelEdit }) {
     setFixedSlots((s) => s.filter((x) => x.id !== id))
   }
 
+  const missingRequired =
+    !isEdit && (!name.trim() || !phone.trim() || dayOfWeek === '' || !timeSlot)
+
   async function save() {
     if (!name.trim()) return
+    if (missingRequired) return
     setSaving(true)
     const payload = {
       profesor_id: user.id,
@@ -422,8 +426,8 @@ function StudentEditForm({ student, onClose, onSaved, onCancelEdit }) {
       </div>
 
       <div className="space-y-3">
-        <input className="input" placeholder="Nombre" value={name} onChange={(e) => setName(e.target.value)} />
-        <input className="input" placeholder="WhatsApp (ej: 5491122334455)" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        <input className="input" placeholder={isEdit ? 'Nombre' : 'Nombre *'} value={name} onChange={(e) => setName(e.target.value)} />
+        <input className="input" placeholder={isEdit ? 'WhatsApp (ej: 5491122334455)' : 'WhatsApp * (ej: 5491122334455)'} value={phone} onChange={(e) => setPhone(e.target.value)} />
 
         <div>
           <div className="label-muted mb-1.5">Género</div>
@@ -469,7 +473,7 @@ function StudentEditForm({ student, onClose, onSaved, onCancelEdit }) {
 
         <div className="grid grid-cols-2 gap-2">
           <select className="input" value={dayOfWeek} onChange={(e) => setDayOfWeek(e.target.value)}>
-            <option value="">Día habitual</option>
+            <option value="">{isEdit ? 'Día habitual' : 'Día habitual *'}</option>
             {DAY_NAMES_FULL.map((d, i) => (
               <option key={i} value={i}>{d}</option>
             ))}
@@ -553,7 +557,13 @@ function StudentEditForm({ student, onClose, onSaved, onCancelEdit }) {
           </div>
         )}
 
-        <button onClick={save} disabled={saving || !name.trim()} className="btn-primary">
+        {!isEdit && missingRequired && (
+          <div className="text-xs text-amber-400 text-center -mt-1">
+            Para crear al alumno completá nombre, WhatsApp, día y horario habitual (marcados con *).
+          </div>
+        )}
+
+        <button onClick={save} disabled={saving || (isEdit ? !name.trim() : missingRequired)} className="btn-primary">
           {isEdit ? 'Guardar cambios' : 'Crear alumno'}
         </button>
         {onCancelEdit && (
