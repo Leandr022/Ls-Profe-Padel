@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { formatMoney, monthLabel, toISODate } from '../lib/helpers'
+import { formatMoney, monthLabel, toISODate, isClassFinished, sizeKeyFor, groupSizeLabel } from '../lib/helpers'
 import Header from '../components/Header'
 import { CashIcon, ChartIcon, UsersIcon, WarningIcon, ChevronDown, TrophyIcon, CheckCircleIcon } from '../components/Icons'
 
+const BREAKDOWN_SIZES = ['individual', 'duo', 'trio', 'grupo4']
+
 async function monthTotals(userId, monthStart, monthEnd) {
-  const [{ data: classes }, { data: expenses }] = await Promise.all([
+  const [{ data: rawClasses }, { data: expenses }] = await Promise.all([
     supabase
       .from('classes')
-      .select('price, commission, paid, student_id, status, students(name)')
+      .select('price, commission, paid, student_id, status, class_date, start_time, end_time, students(name)')
       .eq('profesor_id', userId)
       .gte('class_date', toISODate(monthStart))
       .lte('class_date', toISODate(monthEnd))
@@ -17,11 +19,14 @@ async function monthTotals(userId, monthStart, monthEnd) {
       .not('status', 'eq', 'cancelled'),
     supabase.from('expenses').select('amount').eq('profesor_id', userId).gte('expense_date', toISODate(monthStart)).lte('expense_date', toISODate(monthEnd)),
   ])
-  const facturado = (classes || []).reduce((s, c) => s + Number(c.price || 0), 0)
-  const comisionClub = (classes || []).reduce((s, c) => s + Number(c.commission || 0), 0)
-  const pendiente = (classes || []).filter((c) => !c.paid).reduce((s, c) => s + Number(c.price || 0), 0)
+  // Solo cuenta lo que ya terminó — nada de clases agendadas a futuro dentro del mes.
+  const classes = (rawClasses || []).filter((c) => isClassFinished(c))
+
+  const facturado = classes.reduce((s, c) => s + Number(c.price || 0), 0)
+  const comisionClub = classes.reduce((s, c) => s + Number(c.commission || 0), 0)
+  const pendiente = classes.filter((c) => !c.paid).reduce((s, c) => s + Number(c.price || 0), 0)
   const gastos = (expenses || []).reduce((s, e) => s + Number(e.amount || 0), 0)
-  const done = (classes || []).filter((c) => c.status !== 'absent')
+  const done = classes.filter((c) => c.status !== 'absent')
   const students = new Set(done.map((c) => c.student_id)).size
 
   const countByStudent = new Map()
@@ -33,7 +38,22 @@ async function monthTotals(userId, monthStart, monthEnd) {
   })
   const top = [...countByStudent.values()].sort((a, b) => b.count - a.count).slice(0, 3)
 
-  return { facturado, comisionClub, pendiente, gastos, ganancia: facturado - comisionClub - gastos, clases: done.length, students, top }
+  // Guía de clases por tamaño de grupo: cuántos alumnos (filas) pagaron individual/dúo/trío/grupo
+  // de 4, y cuánto facturaron entre todos — según cuánta gente compartía ese mismo día y horario.
+  const sizeByDateTime = {}
+  classes.forEach((c) => {
+    const key = `${c.class_date}_${c.start_time}`
+    sizeByDateTime[key] = (sizeByDateTime[key] || 0) + 1
+  })
+  const breakdown = Object.fromEntries(BREAKDOWN_SIZES.map((s) => [s, { count: 0, amount: 0 }]))
+  classes.forEach((c) => {
+    const key = `${c.class_date}_${c.start_time}`
+    const size = sizeKeyFor(sizeByDateTime[key] || 1)
+    breakdown[size].count += 1
+    breakdown[size].amount += Number(c.price || 0)
+  })
+
+  return { facturado, comisionClub, pendiente, gastos, ganancia: facturado - comisionClub - gastos, clases: done.length, students, top, breakdown }
 }
 
 function monthRange(date) {
@@ -53,6 +73,7 @@ export default function Stats() {
   const [attention, setAttention] = useState({ cooling: [], debtors: [] })
   const [showAttention, setShowAttention] = useState(false)
   const [showTop, setShowTop] = useState(false)
+  const [showBreakdown, setShowBreakdown] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const now = new Date()
@@ -78,14 +99,15 @@ export default function Stats() {
         supabase.from('students').select('id, name').eq('profesor_id', user.id).eq('status', 'cooling'),
         supabase
           .from('classes')
-          .select('student_id, students(name)')
+          .select('student_id, class_date, start_time, end_time, students(name)')
           .eq('profesor_id', user.id)
           .eq('paid', false)
           .not('student_id', 'is', null)
           .lte('class_date', toISODate(now)),
       ])
       if (cancelled) return
-      const debtorNames = [...new Map((debtClasses || []).map((c) => [c.student_id, c.students?.name])).values()]
+      const finishedDebt = (debtClasses || []).filter((c) => isClassFinished(c))
+      const debtorNames = [...new Map(finishedDebt.map((c) => [c.student_id, c.students?.name])).values()]
       setCurrent(cur)
       setCompareTotals(cmp)
       setAttention({ cooling: cooling || [], debtors: debtorNames })
@@ -107,6 +129,7 @@ export default function Stats() {
         : `▼ ${formatMoney(Math.abs(diff), profile?.currency)} menos que ${monthLabel(compareMonth).toLowerCase()}`
 
   const attentionCount = attention.cooling.length + attention.debtors.length
+  const breakdownTotal = BREAKDOWN_SIZES.reduce((s, size) => s + (current?.breakdown?.[size]?.count || 0), 0)
 
   return (
     <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 fade-in">
@@ -200,7 +223,49 @@ export default function Stats() {
             ))}
           </div>
         )}
+
+        <button onClick={() => setShowBreakdown((v) => !v)} className="w-full flex items-center gap-3 px-4 py-3.5 text-left">
+          <span className="w-8 h-8 rounded-lg bg-brand/15 text-brand flex items-center justify-center"><ChartIcon size={16} /></span>
+          <span className="flex-1 font-semibold">Guía de clases (individual, dúo, trío, grupo de 4)</span>
+          {breakdownTotal > 0 && <span className="text-xs font-bold bg-brand/15 text-brand px-2 py-0.5 rounded-full">{breakdownTotal}</span>}
+          <ChevronDown className={`text-slate-500 transition ${showBreakdown ? 'rotate-180' : ''}`} />
+        </button>
+        {showBreakdown && (
+          <div className="px-4 pb-4">
+            <p className="text-xs text-slate-500 mb-3">
+              La cantidad es de alumnos que pagaron una clase de ese tamaño — si en una clase de 4 vinieron 4, esos 4 cuentan acá en "Grupo de 4".
+            </p>
+            {loading && <div className="text-sm text-slate-500">Cargando...</div>}
+            {!loading && breakdownTotal === 0 && <div className="text-sm text-slate-500">Sin clases finalizadas todavía este mes.</div>}
+            {!loading && breakdownTotal > 0 && (
+              <BreakdownList breakdown={current?.breakdown} total={breakdownTotal} currency={profile?.currency} />
+            )}
+          </div>
+        )}
       </div>
+    </div>
+  )
+}
+
+function BreakdownList({ breakdown, total, currency }) {
+  const maxAmount = Math.max(1, ...Object.values(breakdown || {}).map((b) => b.amount))
+  return (
+    <div className="space-y-3">
+      {BREAKDOWN_SIZES.map((size) => {
+        const b = breakdown?.[size] || { count: 0, amount: 0 }
+        if (b.count === 0) return null
+        return (
+          <div key={size}>
+            <div className="flex items-center justify-between text-sm mb-1">
+              <span className="font-semibold">{groupSizeLabel(size)}</span>
+              <span className="text-slate-400">{formatMoney(b.amount, currency)} · {b.count}</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-bg-card overflow-hidden">
+              <div className="h-full rounded-full bg-brand" style={{ width: `${Math.max(4, (b.amount / maxAmount) * 100)}%` }} />
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

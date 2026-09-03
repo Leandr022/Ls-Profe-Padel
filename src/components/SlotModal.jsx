@@ -502,6 +502,8 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
                               fillTemplate(templates.deuda || 'Hola {nombre}! Te escribo por un pago pendiente de {monto}.', {
                                 nombre: row.students.name,
                                 monto: formatMoney(row.price, profile?.currency),
+                                alias: profile?.payment_alias || '[Tu alias]',
+                                cbu: profile?.payment_cbu_cvu || '[Tu CBU/CVU]',
                               }),
                             )}
                             target="_blank"

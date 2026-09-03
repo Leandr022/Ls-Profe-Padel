@@ -14,11 +14,20 @@ const ALL_FIELDS = ['individual_price', 'duo_price', 'trio_price', 'group4_price
 const EMPTY_PRICES = Object.fromEntries(ALL_FIELDS.map((f) => [f, 0]))
 
 export default function RatesSettings() {
-  const { user, refreshProfile } = useAuth()
+  const { user, profile, refreshProfile } = useAuth()
   const [currency, setCurrency] = useState(null)
   const [pricesByCurrency, setPricesByCurrency] = useState({})
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
+  const [alias, setAlias] = useState(profile?.payment_alias || '')
+  const [cbu, setCbu] = useState(profile?.payment_cbu_cvu || '')
+  const [savingCobro, setSavingCobro] = useState(false)
+  const cobroDirty = alias !== (profile?.payment_alias || '') || cbu !== (profile?.payment_cbu_cvu || '')
+
+  useEffect(() => {
+    setAlias(profile?.payment_alias || '')
+    setCbu(profile?.payment_cbu_cvu || '')
+  }, [profile?.payment_alias, profile?.payment_cbu_cvu])
 
   useEffect(() => {
     if (!user) return
@@ -73,6 +82,13 @@ export default function RatesSettings() {
     setPricesByCurrency(updatedByCurrency)
     setSaving(false)
     setDirty(false)
+  }
+
+  async function saveCobro() {
+    setSavingCobro(true)
+    await supabase.from('profiles').update({ payment_alias: alias.trim() || null, payment_cbu_cvu: cbu.trim() || null }).eq('id', user.id)
+    await refreshProfile()
+    setSavingCobro(false)
   }
 
   if (!currency) return null
@@ -132,6 +148,26 @@ export default function RatesSettings() {
         <button onClick={save} disabled={saving || !dirty} className="btn-primary mt-5">
           Guardar tarifas en {currency}
         </button>
+      </div>
+
+      <div className="card p-4 mt-4">
+        <div className="label-muted mb-1">Datos para cobros</div>
+        <p className="text-xs text-slate-500 mb-3">
+          Se usan en los mensajes de "Aviso de deuda" (Mis mensajes) para que el alumno tenga a mano dónde transferirte. Si los dejás vacíos, esos mensajes van con [Tu alias] / [Tu CBU/CVU] para que los completes vos antes de enviar.
+        </p>
+        <div className="space-y-3">
+          <div>
+            <div className="text-[10px] uppercase font-semibold text-slate-500 mb-1">Alias de tu billetera virtual (opcional)</div>
+            <input className="input" placeholder="tu.alias.mp" value={alias} onChange={(e) => setAlias(e.target.value)} />
+          </div>
+          <div>
+            <div className="text-[10px] uppercase font-semibold text-slate-500 mb-1">CBU o CVU (opcional)</div>
+            <input className="input" placeholder="0000003100000000000000" value={cbu} onChange={(e) => setCbu(e.target.value)} />
+          </div>
+          <button onClick={saveCobro} disabled={savingCobro || !cobroDirty} className="btn-secondary">
+            Guardar datos de cobro
+          </button>
+        </div>
       </div>
     </div>
   )

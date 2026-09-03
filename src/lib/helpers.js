@@ -33,6 +33,15 @@ export function formatMoneyShort(amount) {
   return `$${n.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`
 }
 
+// Una clase "cuenta" para las cuentas (Caja, Estadísticas) recién cuando ya terminó — no apenas
+// se carga. Antes de esa hora, sigue siendo algo agendado a futuro, no plata/asistencia real.
+export function isClassFinished(c, now = new Date()) {
+  if (!c?.class_date) return false
+  const endTime = (c.end_time || c.start_time || '23:59:59').slice(0, 8)
+  const end = new Date(`${c.class_date}T${endTime.length === 5 ? endTime + ':00' : endTime}`)
+  return end.getTime() <= now.getTime()
+}
+
 export function toISODate(d) {
   const yr = d.getFullYear()
   const mo = String(d.getMonth() + 1).padStart(2, '0')

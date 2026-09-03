@@ -5,7 +5,7 @@ import Header from '../../components/Header'
 
 const ITEMS = [
   { key: 'recordatorio', title: 'Recordatorio de clase', desc: 'Se envía antes de cada clase.', vars: '{nombre} {hora}' },
-  { key: 'deuda', title: 'Aviso de pago pendiente', desc: 'Para avisarle a un alumno que te debe.', vars: '{nombre} {monto}' },
+  { key: 'deuda', title: 'Aviso de pago pendiente', desc: 'Para avisarle a un alumno que te debe. {alias} y {cbu} se completan solos con lo que cargaste en Mis tarifas.', vars: '{nombre} {monto} {alias} {cbu}' },
   { key: 'invitacion_hueco', title: 'Invitación a cubrir un hueco', desc: 'Para ofrecerle un hueco libre a un alumno.', vars: '{nombre} {dia} {hora}' },
   { key: 'cancelacion', title: 'Aviso de cancelación de clase', desc: 'Para avisarle a un alumno que su clase no va, por el motivo que sea.', vars: '{nombre} {dia} {hora}' },
   { key: 'reconquista', title: 'Reconquista', desc: 'Para alumnos que dejaron de venir.', vars: '{nombre}' },

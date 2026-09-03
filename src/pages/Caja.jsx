@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { formatMoney, monthLabel, toISODate, waLink, fillTemplate, sizeKeyFor, groupSizeLabel } from '../lib/helpers'
+import { formatMoney, monthLabel, toISODate, waLink, fillTemplate, sizeKeyFor, groupSizeLabel, isClassFinished } from '../lib/helpers'
 import Header from '../components/Header'
 import { ChevronLeft, ChevronRight, ChevronRight as Chev, WhatsAppIcon, PlusIcon, CloseIcon, CheckCircleIcon } from '../components/Icons'
 
@@ -48,12 +48,10 @@ export default function Caja() {
     load()
   }, [user, cursor])
 
-  const todayISO = toISODate(new Date())
-
   // Todas las cuentas de plata (facturado, comisión, quién debe, quién pagó) sólo toman en
-  // cuenta clases que ya pasaron (hasta hoy inclusive) — una clase agendada para mañana o la
+  // cuenta clases que ya terminaron — una clase agendada para más tarde hoy, mañana o la
   // semana que viene todavía no es plata "real" para el mes.
-  const classesUpToToday = useMemo(() => classes.filter((c) => c.class_date <= todayISO), [classes, todayISO])
+  const classesUpToToday = useMemo(() => classes.filter((c) => isClassFinished(c)), [classes])
 
   const totalFacturado = classesUpToToday.reduce((s, c) => s + Number(c.price || 0), 0)
   const totalComision = classesUpToToday.reduce((s, c) => s + Number(c.commission || 0), 0)
@@ -181,7 +179,15 @@ export default function Caja() {
                   <div className="flex items-center gap-2 shrink-0">
                     {d.student?.phone && (
                       <a
-                        href={waLink(d.student.phone, fillTemplate(templates.deuda || '', { nombre: d.student.name, monto: d.total }))}
+                        href={waLink(
+                          d.student.phone,
+                          fillTemplate(templates.deuda || '', {
+                            nombre: d.student.name,
+                            monto: formatMoney(d.total, profile?.currency),
+                            alias: profile?.payment_alias || '[Tu alias]',
+                            cbu: profile?.payment_cbu_cvu || '[Tu CBU/CVU]',
+                          }),
+                        )}
                         target="_blank"
                         rel="noreferrer"
                         onClick={(e) => e.stopPropagation()}
