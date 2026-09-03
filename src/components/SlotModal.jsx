@@ -34,6 +34,7 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
   const [blockSaving, setBlockSaving] = useState(false)
   const [newIsFixed, setNewIsFixed] = useState(true)
   const [waMenuForId, setWaMenuForId] = useState(null)
+  const [removeChoiceForId, setRemoveChoiceForId] = useState(null)
 
   const dayIdx = slot.dayIdx ?? jsDayToIdx(new Date(slot.iso + 'T12:00:00').getDay())
 
@@ -76,15 +77,23 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
   // La comisión al club es un monto fijo POR CLASE (no por alumno), así que si hay varios
   // alumnos en el mismo hueco la repartimos entre todos para que la suma de las filas dé el
   // total real de la clase (y no lo multiplique por la cantidad de alumnos en Caja/Estadísticas).
+  // Las filas "cancelled" (alguien que canceló solo por hoy) NO cuentan para el tamaño del grupo
+  // ni tienen costo — así un dúo donde uno canceló pasa a cobrarse como individual, y un trío
+  // pasa a cobrarse como dúo, automáticamente.
   async function repriceAll(nextRows) {
-    const size = sizeKeyFor(nextRows.length)
+    const activeRows = nextRows.filter((r) => r.status !== 'cancelled')
+    const size = sizeKeyFor(activeRows.length)
     const price = priceFor(size)
     const commissionTotal = commissionFor(size)
-    const commission = nextRows.length > 0 ? commissionTotal / nextRows.length : 0
+    const commission = activeRows.length > 0 ? commissionTotal / activeRows.length : 0
     await Promise.all(
-      nextRows.map((r) => supabase.from('classes').update({ price, commission }).eq('id', r.id)),
+      nextRows.map((r) =>
+        r.status === 'cancelled'
+          ? supabase.from('classes').update({ price: 0, commission: 0 }).eq('id', r.id)
+          : supabase.from('classes').update({ price, commission }).eq('id', r.id),
+      ),
     )
-    return nextRows.map((r) => ({ ...r, price, commission }))
+    return nextRows.map((r) => (r.status === 'cancelled' ? { ...r, price: 0, commission: 0 } : { ...r, price, commission }))
   }
 
   async function insertClass(student) {
@@ -150,9 +159,37 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
     setSaving(false)
   }
 
-  async function removeRow(row) {
+  // Cancela solo la ocurrencia de HOY: el alumno sigue fijo (vuelve la semana que viene), pero
+  // esta clase puntual no cuenta ni cobra, y el resto del grupo se recalcula más chico.
+  async function cancelJustToday(row) {
+    setSaving(true)
+    await supabase.from('classes').update({ status: 'cancelled', price: 0, commission: 0 }).eq('id', row.id)
+    const next = rows.map((r) => (r.id === row.id ? { ...r, status: 'cancelled', price: 0, commission: 0 } : r))
+    const repriced = await repriceAll(next)
+    setRows(repriced)
+    setSaving(false)
+    setRemoveChoiceForId(null)
+  }
+
+  // Saca al alumno de este hueco para siempre: borra la clase y, si era fijo, también la regla
+  // de horario fijo (si no, la próxima semana volvería a aparecer solo).
+  async function removeCompletely(row, alsoUnfix) {
     setSaving(true)
     await supabase.from('classes').delete().eq('id', row.id)
+    if (alsoUnfix) {
+      await supabase
+        .from('student_fixed_slots')
+        .delete()
+        .eq('profesor_id', user.id)
+        .eq('student_id', row.student_id)
+        .eq('day_of_week', dayIdx)
+        .eq('start_time', slot.time)
+      setFixedIds((f) => {
+        const n = new Set(f)
+        n.delete(row.student_id)
+        return n
+      })
+    }
     const next = rows.filter((r) => r.id !== row.id)
     if (next.length > 0) {
       const repriced = await repriceAll(next)
@@ -160,6 +197,17 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
     } else {
       setRows([])
     }
+    setSaving(false)
+    setRemoveChoiceForId(null)
+  }
+
+  // Deshace una cancelación de hoy: el alumno vuelve a contar en el grupo y a cobrarse.
+  async function reactivateRow(row) {
+    setSaving(true)
+    await supabase.from('classes').update({ status: 'scheduled' }).eq('id', row.id)
+    const next = rows.map((r) => (r.id === row.id ? { ...r, status: 'scheduled' } : r))
+    const repriced = await repriceAll(next)
+    setRows(repriced)
     setSaving(false)
   }
 
@@ -252,7 +300,8 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
     onSaved()
   }
 
-  const sizeLabel = rows.length > 0 ? groupSizeLabel(sizeKeyFor(rows.length)) : null
+  const activeCount = rows.filter((r) => r.status !== 'cancelled').length
+  const sizeLabel = activeCount > 0 ? groupSizeLabel(sizeKeyFor(activeCount)) : null
 
   if (slot.block) {
     return (
@@ -368,7 +417,30 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
         )}
 
         <div className="space-y-3">
-          {rows.map((row) => (
+          {rows.map((row) =>
+            row.status === 'cancelled' ? (
+              <div key={row.id} className="card p-3 opacity-60">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-semibold text-sm text-slate-400 line-through truncate">{row.students?.name}</span>
+                      <span className="text-[10px] font-bold uppercase bg-red-500/15 text-red-400 px-1.5 py-0.5 rounded-full shrink-0">Canceló hoy</span>
+                    </div>
+                    {fixedIds.has(row.student_id) && (
+                      <div className="text-[11px] text-slate-500 mt-0.5">Sigue fijo — vuelve la semana que viene.</div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button onClick={() => reactivateRow(row)} disabled={saving} className="btn-secondary p-2 text-brand" title="Reactivar">
+                      ↺
+                    </button>
+                    <button onClick={() => removeCompletely(row, false)} disabled={saving} className="btn-secondary p-2 text-red-400" title="Eliminar del todo">
+                      <CloseIcon size={14} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
             <div key={row.id} className="card p-3">
               <div className="flex items-center gap-1.5 flex-wrap mb-2">
                 <span className="font-semibold text-sm text-brand">
@@ -380,6 +452,21 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
                 )}
                 {debtIds.has(row.student_id) && <WarningIcon size={14} className="text-amber-400" />}
               </div>
+
+              {removeChoiceForId === row.id && (
+                <div className="card p-2.5 mb-2 bg-bg-card space-y-1.5">
+                  <div className="text-xs font-semibold text-slate-300 mb-1">¿Cómo lo sacás?</div>
+                  <button onClick={() => cancelJustToday(row)} disabled={saving} className="w-full text-left text-xs px-2.5 py-2 rounded-lg bg-brand/10 text-brand font-semibold">
+                    Canceló solo hoy — sigue fijo las próximas semanas
+                  </button>
+                  <button onClick={() => removeCompletely(row, true)} disabled={saving} className="w-full text-left text-xs px-2.5 py-2 rounded-lg bg-red-500/10 text-red-400 font-semibold">
+                    Sacarlo también de fijo, para siempre
+                  </button>
+                  <button onClick={() => setRemoveChoiceForId(null)} className="w-full text-center text-xs px-2.5 py-1.5 text-slate-500">
+                    Cancelar
+                  </button>
+                </div>
+              )}
 
               <div className="flex items-center gap-1.5 mb-2 flex-wrap">
                 <button onClick={() => toggleFalta(row)} className={`pill text-xs font-semibold ${row.status === 'absent' ? 'bg-amber-500/20 text-amber-400' : 'card text-slate-300'}`}>
@@ -448,7 +535,12 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
                 <button onClick={() => setSwapForId(swapForId === row.id ? null : row.id)} className="btn-secondary p-2 text-slate-300" title="Cambiar alumno">
                   ⇄
                 </button>
-                <button onClick={() => removeRow(row)} disabled={saving} className="btn-secondary p-2 text-red-400" title="Quitar de este hueco">
+                <button
+                  onClick={() => (fixedIds.has(row.student_id) ? setRemoveChoiceForId(removeChoiceForId === row.id ? null : row.id) : removeCompletely(row, false))}
+                  disabled={saving}
+                  className="btn-secondary p-2 text-red-400"
+                  title="Quitar de este hueco"
+                >
                   <CloseIcon size={14} />
                 </button>
               </div>
@@ -490,7 +582,8 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
                 )}
               </div>
             </div>
-          ))}
+            ),
+          )}
         </div>
 
         {sizeLabel && <div className="text-sm text-slate-400 mt-4">Tipo: <span className="text-brand font-semibold">{sizeLabel}</span></div>}

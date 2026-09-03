@@ -20,7 +20,7 @@ import {
   commissionForSize,
 } from '../lib/helpers'
 import Header from '../components/Header'
-import { ChevronLeft, ChevronRight, CloseIcon, WhatsAppIcon } from '../components/Icons'
+import { ChevronLeft, ChevronRight, CloseIcon, WhatsAppIcon, CalendarIcon } from '../components/Icons'
 import SlotModal from '../components/SlotModal'
 
 function computeHoursForDay(dayIdx, workingDays, slots) {
@@ -35,7 +35,11 @@ function computeHoursForDay(dayIdx, workingDays, slots) {
 // Cada clase (o bloqueo manual) ocupa su horario de inicio + la duración configurada
 // (end_time), así que un hueco que cae DENTRO de una clase o un bloqueo que ya empezó en
 // un horario anterior no puede reservarse aparte: se muestra ocupado, en vez de "Libre".
+// "ownActive" excluye las clases con status "cancelled" (alguien que canceló solo por hoy):
+// esas no deben contar como que el hueco está ocupado ni seguir bloqueando los huecos
+// siguientes — el hueco vuelve a estar libre para agendar a otra persona ese mismo día.
 function buildOccupancy(hours, classes, blocks, defaultDuration) {
+  const activeClasses = classes.filter((c) => c.status !== 'cancelled')
   const byTime = {}
   classes.forEach((c) => {
     const key = c.start_time?.slice(0, 5)
@@ -56,22 +60,25 @@ function buildOccupancy(hours, classes, blocks, defaultDuration) {
   }
 
   return hours.map((h) => {
-    if (blockByTime[h]) return { time: h, own: null, ownBlock: blockByTime[h], coveredBy: null, coveredByBlock: null }
-    if (byTime[h]) return { time: h, own: byTime[h], ownBlock: null, coveredBy: null, coveredByBlock: null }
+    if (blockByTime[h]) return { time: h, own: null, ownActive: [], ownBlock: blockByTime[h], coveredBy: null, coveredByBlock: null }
+    if (byTime[h]) {
+      const ownActive = byTime[h].filter((c) => c.status !== 'cancelled')
+      return { time: h, own: byTime[h], ownActive, ownBlock: null, coveredBy: null, coveredByBlock: null }
+    }
 
     const coveredByBlock = (blocks || []).find((b) => {
       const s = b.start_time?.slice(0, 5)
       if (!s) return false
       return s < h && h < endOf(b)
     })
-    if (coveredByBlock) return { time: h, own: null, ownBlock: null, coveredBy: null, coveredByBlock }
+    if (coveredByBlock) return { time: h, own: null, ownActive: [], ownBlock: null, coveredBy: null, coveredByBlock }
 
-    const coveredBy = classes.find((c) => {
+    const coveredBy = activeClasses.find((c) => {
       const s = c.start_time?.slice(0, 5)
       if (!s) return false
       return s < h && h < endOf(c)
     })
-    return { time: h, own: null, ownBlock: null, coveredBy: coveredBy || null, coveredByBlock: null }
+    return { time: h, own: null, ownActive: [], ownBlock: null, coveredBy: coveredBy || null, coveredByBlock: null }
   })
 }
 
@@ -89,6 +96,10 @@ export default function Calendar() {
   const [loading, setLoading] = useState(true)
   const [activeSlot, setActiveSlot] = useState(null) // { iso, dayIdx, time, existingClass }
   const [showHint, setShowHint] = useState(true)
+  const [showDatePicker, setShowDatePicker] = useState(false)
+  const [pickerMonth, setPickerMonth] = useState(cursor)
+  const [pickerSelected, setPickerSelected] = useState(cursor)
+  const [pickerDots, setPickerDots] = useState(new Set())
 
   const loadSchedule = useCallback(async () => {
     if (!user) return
@@ -142,11 +153,14 @@ export default function Calendar() {
           if (blocked) return
 
           const existingForSlot = (map[iso] || []).filter((c) => c.start_time?.slice(0, 5) === time)
+          // Un alumno con una fila "cancelled" ya tiene una decisión tomada para hoy — no se
+          // recrea, pero tampoco cuenta para el tamaño del grupo del resto.
           const existingStudentIds = new Set(existingForSlot.map((c) => c.student_id))
+          const activeExisting = existingForSlot.filter((c) => c.status !== 'cancelled')
           const missing = group.filter((f) => !existingStudentIds.has(f.student_id))
           if (!missing.length) return
 
-          const totalCount = existingForSlot.length + missing.length
+          const totalCount = activeExisting.length + missing.length
           const size = sizeKeyFor(totalCount)
           const price = priceForSize(rates, size)
           const commission = commissionForSize(rates, size) / totalCount
@@ -234,6 +248,52 @@ export default function Calendar() {
     loadClasses(from, to).then(() => setLoading(false))
   }, [view, cursor, loadClasses])
 
+  // Carga qué días del mes que se está mostrando en el selector de fecha tienen algo cargado
+  // (clase o bloqueo), para pintar el puntito — solo mientras el selector está abierto.
+  useEffect(() => {
+    if (!showDatePicker || !user) return
+    const first = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth(), 1)
+    const last = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() + 1, 0)
+    Promise.all([
+      supabase
+        .from('classes')
+        .select('class_date')
+        .eq('profesor_id', user.id)
+        .gte('class_date', toISODate(first))
+        .lte('class_date', toISODate(last))
+        .not('status', 'eq', 'cancelled'),
+      supabase
+        .from('schedule_blocks')
+        .select('block_date')
+        .eq('profesor_id', user.id)
+        .gte('block_date', toISODate(first))
+        .lte('block_date', toISODate(last)),
+    ]).then(([{ data: cls }, { data: blk }]) => {
+      const set = new Set()
+      ;(cls || []).forEach((c) => set.add(c.class_date))
+      ;(blk || []).forEach((b) => set.add(b.block_date))
+      setPickerDots(set)
+    })
+  }, [showDatePicker, pickerMonth, user])
+
+  function openDatePicker() {
+    setPickerMonth(cursor)
+    setPickerSelected(cursor)
+    setShowDatePicker(true)
+  }
+
+  function goToPicked() {
+    if (!pickerSelected) return
+    setCursor(pickerSelected)
+    setShowDatePicker(false)
+  }
+
+  function goToTodayFromPicker() {
+    const t = new Date()
+    setCursor(t)
+    setShowDatePicker(false)
+  }
+
   function shift(delta) {
     if (view === 'dia') setCursor((c) => addDays(c, delta))
     else if (view === 'semana') setCursor((c) => addDays(c, delta * 7))
@@ -285,17 +345,39 @@ export default function Calendar() {
 
       <div className="flex items-center justify-between mb-1">
         <button onClick={() => shift(-1)} className="btn-secondary p-2 rounded-full"><ChevronLeft /></button>
-        <div className="text-center">
-          <div className="font-bold">
-            {view === 'dia' && (toISODate(cursor) === toISODate(new Date()) ? 'Hoy · ' : '')}
-            {view === 'dia' && cursor.toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })}
-            {view === 'semana' && `${startOfWeek(cursor).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })} – ${addDays(startOfWeek(cursor), 6).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}`}
-            {view === 'mes' && monthLabel(cursor)}
+        <div className="text-center relative">
+          <div className="flex items-center justify-center gap-1.5">
+            <div className="font-bold">
+              {view === 'dia' && (toISODate(cursor) === toISODate(new Date()) ? 'Hoy · ' : '')}
+              {view === 'dia' && cursor.toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })}
+              {view === 'semana' && `${startOfWeek(cursor).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })} – ${addDays(startOfWeek(cursor), 6).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}`}
+              {view === 'mes' && monthLabel(cursor)}
+            </div>
+            <button
+              onClick={() => (showDatePicker ? setShowDatePicker(false) : openDatePicker())}
+              className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${showDatePicker ? 'bg-brand/15 border border-brand text-brand' : 'card text-brand'}`}
+              title="Elegir fecha"
+            >
+              <CalendarIcon size={15} />
+            </button>
           </div>
           {!isTodayInView && (
             <button onClick={() => setCursor(new Date())} className="text-brand text-xs font-semibold underline decoration-dotted mt-0.5">
               Volver a hoy
             </button>
+          )}
+
+          {showDatePicker && (
+            <DatePickerPopup
+              month={pickerMonth}
+              selected={pickerSelected}
+              dots={pickerDots}
+              onShiftMonth={(d) => setPickerMonth((m) => new Date(m.getFullYear(), m.getMonth() + d, 1))}
+              onPick={setPickerSelected}
+              onToday={goToTodayFromPicker}
+              onConfirm={goToPicked}
+              onClose={() => setShowDatePicker(false)}
+            />
           )}
         </div>
         <button onClick={() => shift(1)} className="btn-secondary p-2 rounded-full"><ChevronRight /></button>
@@ -361,7 +443,7 @@ function DayView({ date, workingDays, slots, classes, blocks, loading, defaultDu
   const dayIdx = jsDayToIdx(date.getDay())
   const hours = computeHoursForDay(dayIdx, workingDays, slots)
   const occupancy = buildOccupancy(hours, classes, blocks, defaultDuration)
-  const freeCount = occupancy.filter((o) => !o.own && !o.ownBlock && !o.coveredBy && !o.coveredByBlock).length
+  const freeCount = occupancy.filter((o) => !o.ownActive?.length && !o.ownBlock && !o.coveredBy && !o.coveredByBlock).length
 
   if (!loading && hours.length === 0) {
     return (
@@ -379,9 +461,10 @@ function DayView({ date, workingDays, slots, classes, blocks, loading, defaultDu
         ¿Este día trabajás distinto? Ajustar solo este día
       </a>
       <div className="card divide-y divide-bg-border mt-3">
-        {occupancy.map(({ time: h, own, ownBlock, coveredBy, coveredByBlock }) => {
-          const list = own || []
-          const allPaid = list.length > 0 && list.every((c) => c.paid)
+        {occupancy.map(({ time: h, own, ownActive, ownBlock, coveredBy, coveredByBlock }) => {
+          const allRows = own || []
+          const activeRows = ownActive || []
+          const allPaid = activeRows.length > 0 && activeRows.every((c) => c.paid)
 
           if (ownBlock) {
             return (
@@ -440,14 +523,14 @@ function DayView({ date, workingDays, slots, classes, blocks, loading, defaultDu
           return (
             <button
               key={h}
-              onClick={() => onSlotClick(h, list)}
+              onClick={() => onSlotClick(h, allRows)}
               className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-white/5 transition"
             >
               <span className="text-slate-300 font-medium">{h}</span>
-              {list.length > 0 ? (
+              {activeRows.length > 0 ? (
                 <span className="flex items-center gap-2 min-w-0">
                   <span className="font-semibold truncate">
-                    {list.map((c, i) => (
+                    {activeRows.map((c, i) => (
                       <span key={c.id}>
                         {i > 0 && ', '}
                         {c.students?.name || 'Alumno'}
@@ -482,9 +565,10 @@ function WeekView({ cursor, workingDays, slots, classesMap, blocksMap, defaultDu
         const dayIdx = jsDayToIdx(d.getDay())
         const hours = computeHoursForDay(dayIdx, workingDays, slots)
         const dayClasses = classesMap[iso] || []
+        const activeDayClasses = dayClasses.filter((c) => c.status !== 'cancelled')
         const dayBlocks = blocksMap[iso] || []
         const occupancy = buildOccupancy(hours, dayClasses, dayBlocks, defaultDuration)
-        const freeHuecos = occupancy.filter((o) => !o.own && !o.ownBlock && !o.coveredBy && !o.coveredByBlock).length
+        const freeHuecos = occupancy.filter((o) => !o.ownActive?.length && !o.ownBlock && !o.coveredBy && !o.coveredByBlock).length
         const isToday = iso === today
         return (
           <button
@@ -499,13 +583,72 @@ function WeekView({ cursor, workingDays, slots, classesMap, blocksMap, defaultDu
             <div className="flex-1 text-sm text-slate-400">
               {hours.length === 0
                 ? 'Sin clases'
-                : `${dayClasses.length ? `${dayClasses.length} alumno${dayClasses.length > 1 ? 's' : ''}` : 'Sin clases'} · ${freeHuecos} huecos libres`}
+                : `${activeDayClasses.length ? `${activeDayClasses.length} alumno${activeDayClasses.length > 1 ? 's' : ''}` : 'Sin clases'} · ${freeHuecos} huecos libres`}
             </div>
             <ChevronRight className="text-slate-500" />
           </button>
         )
       })}
     </div>
+  )
+}
+
+function DatePickerPopup({ month, selected, dots, onShiftMonth, onPick, onToday, onConfirm, onClose }) {
+  const year = month.getFullYear()
+  const m = month.getMonth()
+  const first = new Date(year, m, 1)
+  const startIdx = jsDayToIdx(first.getDay())
+  const daysInMonth = new Date(year, m + 1, 0).getDate()
+  const cells = []
+  for (let i = 0; i < startIdx; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+
+  const todayIso = toISODate(new Date())
+  const selectedIso = selected ? toISODate(selected) : null
+
+  return (
+    <>
+      <div className="fixed inset-0 z-30" onClick={onClose} />
+      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 card p-3.5 z-40 w-72 text-left shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-2.5">
+          <button onClick={() => onShiftMonth(-1)} className="btn-secondary p-1.5 rounded-lg"><ChevronLeft size={14} /></button>
+          <div className="font-bold text-sm">{monthLabel(month)}</div>
+          <button onClick={() => onShiftMonth(1)} className="btn-secondary p-1.5 rounded-lg"><ChevronRight size={14} /></button>
+        </div>
+        <div className="grid grid-cols-7 gap-1 mb-1">
+          {DAY_NAMES.map((d) => (
+            <div key={d} className="text-center text-[10px] text-slate-500 font-bold">{d}</div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((day, i) => {
+            if (!day) return <div key={i} />
+            const dateObj = new Date(year, m, day)
+            const iso = toISODate(dateObj)
+            const isToday = iso === todayIso
+            const isSelected = iso === selectedIso
+            return (
+              <button
+                key={i}
+                onClick={() => onPick(dateObj)}
+                className={`relative aspect-square rounded-lg flex items-center justify-center text-xs transition ${
+                  isToday ? 'bg-brand text-white font-bold' : isSelected ? 'ring-2 ring-brand text-slate-100 font-bold' : 'text-slate-200 hover:bg-white/5'
+                }`}
+              >
+                {day}
+                {dots.has(iso) && !isToday && <span className="absolute bottom-0.5 w-1 h-1 rounded-full bg-brand" />}
+              </button>
+            )
+          })}
+        </div>
+        <div className="flex gap-2 mt-3">
+          <button onClick={onToday} className="btn-secondary flex-1 text-xs py-2">Hoy</button>
+          <button onClick={onConfirm} disabled={!selected} className="btn-primary flex-1 text-xs py-2">
+            Ir al {selected ? selected.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }) : '...'}
+          </button>
+        </div>
+      </div>
+    </>
   )
 }
 
