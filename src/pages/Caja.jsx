@@ -51,9 +51,11 @@ export default function Caja() {
   const totalGastos = expenses.reduce((s, e) => s + Number(e.amount || 0), 0)
   const totalNeto = totalFacturado - totalComision - totalGastos
 
+  const todayISO = toISODate(new Date())
+
   const debtByStudent = useMemo(() => {
     const map = {}
-    classes.filter((c) => !c.paid).forEach((c) => {
+    classes.filter((c) => !c.paid && c.class_date <= todayISO).forEach((c) => {
       const id = c.student_id
       if (!map[id]) map[id] = { student: c.students, total: 0 }
       map[id].total += Number(c.price || 0)
