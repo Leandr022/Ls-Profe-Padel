@@ -15,6 +15,9 @@ import {
   fillTemplate,
   categoryLabel,
   addMinutesToTime,
+  sizeKeyFor,
+  priceForSize,
+  commissionForSize,
 } from '../lib/helpers'
 import Header from '../components/Header'
 import { ChevronLeft, ChevronRight, CloseIcon, WhatsAppIcon } from '../components/Icons'
@@ -81,19 +84,99 @@ export default function Calendar() {
   const [slots, setSlots] = useState([])
   const [classesMap, setClassesMap] = useState({}) // iso -> [{...class, students:{name}}]
   const [blocksMap, setBlocksMap] = useState({}) // iso -> [{...schedule_blocks row}]
+  const [fixedSlots, setFixedSlots] = useState([]) // todos los horarios fijos del profe (student_fixed_slots)
+  const [rates, setRates] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeSlot, setActiveSlot] = useState(null) // { iso, dayIdx, time, existingClass }
   const [showHint, setShowHint] = useState(true)
 
   const loadSchedule = useCallback(async () => {
     if (!user) return
-    const [{ data: wd }, { data: sl }] = await Promise.all([
+    const [{ data: wd }, { data: sl }, { data: fx }, { data: rt }] = await Promise.all([
       supabase.from('working_days').select('*').eq('profesor_id', user.id),
       supabase.from('schedule_slots').select('*').eq('profesor_id', user.id),
+      supabase.from('student_fixed_slots').select('*').eq('profesor_id', user.id),
+      supabase.from('rates').select('*').eq('profesor_id', user.id).maybeSingle(),
     ])
     setWorkingDays(wd || [])
     setSlots(sl || [])
+    setFixedSlots(fx || [])
+    setRates(rt || null)
   }, [user])
+
+  // Los "horarios fijos" (student_fixed_slots) son la REGLA (ej: Jona todos los lunes a las
+  // 18:00); las filas reales en `classes` son la ocurrencia de cada semana. Para que el profe
+  // no tenga que volver a cargar la clase semana a semana, cada vez que se mira un rango de
+  // fechas creamos automáticamente las clases que falten para esa regla (solo hacia adelante,
+  // nunca en el pasado, y respetando bloqueos y horarios ya deshabilitados).
+  const materializeFixedSlots = useCallback(
+    async (fromDate, toDate, map, bmap) => {
+      if (!fixedSlots.length || !rates) return
+      const todayIso = toISODate(new Date())
+      const defaultDuration = profile?.class_duration_minutes || 60
+      const toInsert = []
+
+      for (let d = new Date(fromDate); toISODate(d) <= toISODate(toDate); d = addDays(d, 1)) {
+        const iso = toISODate(d)
+        if (iso < todayIso) continue
+        const dIdx = jsDayToIdx(d.getDay())
+        const dayFixed = fixedSlots.filter((f) => f.day_of_week === dIdx)
+        if (!dayFixed.length) continue
+
+        const hoursForDay = computeHoursForDay(dIdx, workingDays, slots)
+        const byTime = {}
+        dayFixed.forEach((f) => {
+          const t = f.start_time?.slice(0, 5)
+          if (!t || !hoursForDay.includes(t)) return
+          if (!byTime[t]) byTime[t] = []
+          byTime[t].push(f)
+        })
+
+        const dayBlocks = bmap[iso] || []
+        Object.entries(byTime).forEach(([time, group]) => {
+          const blocked = dayBlocks.some((b) => {
+            const s = b.start_time?.slice(0, 5)
+            const e = b.end_time ? b.end_time.slice(0, 5) : addMinutesToTime(s, defaultDuration)
+            return s === time || (s < time && time < e)
+          })
+          if (blocked) return
+
+          const existingForSlot = (map[iso] || []).filter((c) => c.start_time?.slice(0, 5) === time)
+          const existingStudentIds = new Set(existingForSlot.map((c) => c.student_id))
+          const missing = group.filter((f) => !existingStudentIds.has(f.student_id))
+          if (!missing.length) return
+
+          const totalCount = existingForSlot.length + missing.length
+          const size = sizeKeyFor(totalCount)
+          const price = priceForSize(rates, size)
+          const commission = commissionForSize(rates, size) / totalCount
+          missing.forEach((f) => {
+            toInsert.push({
+              profesor_id: user.id,
+              student_id: f.student_id,
+              class_date: iso,
+              start_time: time,
+              end_time: addMinutesToTime(time, defaultDuration),
+              status: 'scheduled',
+              price,
+              commission,
+            })
+          })
+        })
+      }
+
+      if (!toInsert.length) return
+      const { data: inserted } = await supabase
+        .from('classes')
+        .insert(toInsert)
+        .select('*, students(id, name, phone, category, category_level)')
+      ;(inserted || []).forEach((c) => {
+        if (!map[c.class_date]) map[c.class_date] = []
+        map[c.class_date].push(c)
+      })
+    },
+    [user, fixedSlots, rates, workingDays, slots, profile],
+  )
 
   const loadClasses = useCallback(
     async (fromDate, toDate) => {
@@ -117,15 +200,18 @@ export default function Calendar() {
         if (!map[c.class_date]) map[c.class_date] = []
         map[c.class_date].push(c)
       })
-      setClassesMap(map)
       const bmap = {}
       ;(blockData || []).forEach((b) => {
         if (!bmap[b.block_date]) bmap[b.block_date] = []
         bmap[b.block_date].push(b)
       })
+
+      await materializeFixedSlots(fromDate, toDate, map, bmap)
+
+      setClassesMap(map)
       setBlocksMap(bmap)
     },
-    [user],
+    [user, materializeFixedSlots],
   )
 
   useEffect(() => {
@@ -164,6 +250,14 @@ export default function Calendar() {
     }
   }
 
+  const today = new Date()
+  const isTodayInView =
+    view === 'dia'
+      ? toISODate(cursor) === toISODate(today)
+      : view === 'semana'
+        ? toISODate(startOfWeek(cursor)) <= toISODate(today) && toISODate(today) <= toISODate(addDays(startOfWeek(cursor), 6))
+        : cursor.getFullYear() === today.getFullYear() && cursor.getMonth() === today.getMonth()
+
   return (
     <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 fade-in">
       <Header backTo="/panel" backLabel="Panel" />
@@ -198,6 +292,11 @@ export default function Calendar() {
             {view === 'semana' && `${startOfWeek(cursor).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })} – ${addDays(startOfWeek(cursor), 6).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}`}
             {view === 'mes' && monthLabel(cursor)}
           </div>
+          {!isTodayInView && (
+            <button onClick={() => setCursor(new Date())} className="text-brand text-xs font-semibold underline decoration-dotted mt-0.5">
+              Volver a hoy
+            </button>
+          )}
         </div>
         <button onClick={() => shift(1)} className="btn-secondary p-2 rounded-full"><ChevronRight /></button>
       </div>

@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { formatMoney, waLink, fillTemplate, groupSizeLabel, jsDayToIdx, categoryLabel, addMinutesToTime } from '../lib/helpers'
-import { CloseIcon, WhatsAppIcon, PlusIcon, WarningIcon, LockIcon } from './Icons'
-
-function sizeKeyFor(count) {
-  if (count <= 1) return 'individual'
-  if (count === 2) return 'duo'
-  if (count === 3) return 'trio'
-  return 'grupo4'
-}
+import {
+  formatMoney,
+  waLink,
+  fillTemplate,
+  groupSizeLabel,
+  jsDayToIdx,
+  categoryLabel,
+  addMinutesToTime,
+  sizeKeyFor,
+  priceForSize,
+  commissionForSize,
+  DAY_NAMES_FULL,
+} from '../lib/helpers'
+import { CloseIcon, WhatsAppIcon, PlusIcon, WarningIcon, LockIcon, ChevronDown } from './Icons'
 
 export default function SlotModal({ slot, profile, onClose, onSaved }) {
   const { user } = useAuth()
@@ -27,6 +32,8 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
   const [showBlockForm, setShowBlockForm] = useState(false)
   const [blockReason, setBlockReason] = useState('')
   const [blockSaving, setBlockSaving] = useState(false)
+  const [newIsFixed, setNewIsFixed] = useState(true)
+  const [waMenuForId, setWaMenuForId] = useState(null)
 
   const dayIdx = slot.dayIdx ?? jsDayToIdx(new Date(slot.iso + 'T12:00:00').getDay())
 
@@ -57,9 +64,8 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
-  const priceFor = (size) => (rates ? { individual: rates.individual_price, duo: rates.duo_price, trio: rates.trio_price, grupo4: rates.group4_price }[size] : 0)
-  const commissionFor = (size) =>
-    (rates ? { individual: rates.individual_commission, duo: rates.duo_commission, trio: rates.trio_commission, grupo4: rates.group4_commission }[size] : 0) || 0
+  const priceFor = (size) => priceForSize(rates, size)
+  const commissionFor = (size) => commissionForSize(rates, size)
 
   const assignedIds = new Set(rows.map((r) => r.student_id))
   const suggestions = query.trim()
@@ -100,6 +106,17 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
       .select('*, students(id, name, phone, category, category_level)')
       .single()
     if (!data) return
+
+    if (newIsFixed && !fixedIds.has(student.id)) {
+      await supabase.from('student_fixed_slots').insert({
+        profesor_id: user.id,
+        student_id: student.id,
+        day_of_week: dayIdx,
+        start_time: slot.time,
+      })
+      setFixedIds((f) => new Set(f).add(student.id))
+    }
+
     const next = [...rows, data]
     const repriced = await repriceAll(next)
     setRows(repriced)
@@ -278,6 +295,26 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
           <button onClick={onClose} className="text-slate-400"><CloseIcon /></button>
         </div>
 
+        <div className="mb-2">
+          <div className="text-[10px] uppercase font-semibold text-slate-500 mb-1">¿Viene fijo o solo por hoy?</div>
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              onClick={() => setNewIsFixed(true)}
+              className={`py-2 rounded-xl text-xs font-bold ${newIsFixed ? 'bg-brand/15 border border-brand text-brand' : 'card text-slate-400'}`}
+            >
+              Fijo ↺ <span className="font-normal">todas las semanas</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setNewIsFixed(false)}
+              className={`py-2 rounded-xl text-xs font-bold ${!newIsFixed ? 'bg-brand/15 border border-brand text-brand' : 'card text-slate-400'}`}
+            >
+              Solo por hoy <span className="font-normal">invitado</span>
+            </button>
+          </div>
+        </div>
+
         <div className="flex gap-2 mb-4 relative">
           <input
             className="input flex-1"
@@ -349,15 +386,64 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
                   {row.status === 'absent' ? 'Faltó' : 'Falta'}
                 </button>
                 {row.students?.phone && (
-                  <a
-                    href={waLink(row.students.phone, fillTemplate(templates.recordatorio || 'Hola {nombre}!', { nombre: row.students.name, hora: slot.time }))}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={() => markNotified(row)}
-                    className="btn-secondary p-2 text-brand"
-                  >
-                    <WhatsAppIcon size={14} />
-                  </a>
+                  <div className="relative">
+                    <button
+                      onClick={() => setWaMenuForId(waMenuForId === row.id ? null : row.id)}
+                      className="btn-secondary p-2 text-brand flex items-center gap-0.5"
+                    >
+                      <WhatsAppIcon size={14} />
+                      <ChevronDown size={11} />
+                    </button>
+                    {waMenuForId === row.id && (
+                      <div className="absolute top-full left-0 mt-1 card z-10 divide-y divide-bg-border overflow-hidden w-52">
+                        <a
+                          href={waLink(row.students.phone, fillTemplate(templates.recordatorio || 'Hola {nombre}! Te espero a las {hora}.', { nombre: row.students.name, hora: slot.time }))}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={() => {
+                            markNotified(row)
+                            setWaMenuForId(null)
+                          }}
+                          className="block px-3 py-2.5 text-sm hover:bg-white/5"
+                        >
+                          Recordatorio de clase
+                        </a>
+                        {debtIds.has(row.student_id) && (
+                          <a
+                            href={waLink(
+                              row.students.phone,
+                              fillTemplate(templates.deuda || 'Hola {nombre}! Te escribo por un pago pendiente de {monto}.', {
+                                nombre: row.students.name,
+                                monto: formatMoney(row.price, profile?.currency),
+                              }),
+                            )}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={() => setWaMenuForId(null)}
+                            className="block px-3 py-2.5 text-sm text-amber-400 hover:bg-white/5"
+                          >
+                            Aviso de deuda
+                          </a>
+                        )}
+                        <a
+                          href={waLink(
+                            row.students.phone,
+                            fillTemplate(templates.cancelacion || 'Hola {nombre}! Te escribo para avisarte que se cancela la clase de las {hora} de este {dia}.', {
+                              nombre: row.students.name,
+                              hora: slot.time,
+                              dia: DAY_NAMES_FULL[dayIdx],
+                            }),
+                          )}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={() => setWaMenuForId(null)}
+                          className="block px-3 py-2.5 text-sm text-red-400 hover:bg-white/5"
+                        >
+                          Avisar cancelación
+                        </a>
+                      </div>
+                    )}
+                  </div>
                 )}
                 <button onClick={() => setSwapForId(swapForId === row.id ? null : row.id)} className="btn-secondary p-2 text-slate-300" title="Cambiar alumno">
                   ⇄

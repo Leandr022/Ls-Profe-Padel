@@ -76,6 +76,22 @@ export function timeSlots(startTime, endTime, stepMinutes = 60) {
   return slots
 }
 
+// Mapea la cantidad de gente en un hueco al tipo de tarifa que corresponde.
+export function sizeKeyFor(count) {
+  if (count <= 1) return 'individual'
+  if (count === 2) return 'duo'
+  if (count === 3) return 'trio'
+  return 'grupo4'
+}
+
+export function priceForSize(rates, size) {
+  return rates ? { individual: rates.individual_price, duo: rates.duo_price, trio: rates.trio_price, grupo4: rates.group4_price }[size] : 0
+}
+
+export function commissionForSize(rates, size) {
+  return (rates ? { individual: rates.individual_commission, duo: rates.duo_commission, trio: rates.trio_commission, grupo4: rates.group4_commission }[size] : 0) || 0
+}
+
 export function groupSizeLabel(size) {
   return {
     individual: 'Individual',

@@ -7,6 +7,7 @@ const ITEMS = [
   { key: 'recordatorio', title: 'Recordatorio de clase', desc: 'Se envía antes de cada clase.', vars: '{nombre} {hora}' },
   { key: 'deuda', title: 'Aviso de pago pendiente', desc: 'Para avisarle a un alumno que te debe.', vars: '{nombre} {monto}' },
   { key: 'invitacion_hueco', title: 'Invitación a cubrir un hueco', desc: 'Para ofrecerle un hueco libre a un alumno.', vars: '{nombre} {dia} {hora}' },
+  { key: 'cancelacion', title: 'Aviso de cancelación de clase', desc: 'Para avisarle a un alumno que su clase no va, por el motivo que sea.', vars: '{nombre} {dia} {hora}' },
   { key: 'reconquista', title: 'Reconquista', desc: 'Para alumnos que dejaron de venir.', vars: '{nombre}' },
 ]
 
@@ -35,7 +36,7 @@ export default function MessagesSettings() {
       <Header backTo="/configuracion" backLabel="Configuración" />
       <h1 className="text-xl font-extrabold mb-0.5">Mis mensajes</h1>
       <p className="text-slate-400 text-sm mb-5">
-        Configurá los WhatsApp que la app te arma sola: recordatorios, invitaciones a cubrir un hueco y reconquista. Usá las variables entre llaves para personalizar cada envío.
+        Configurá los WhatsApp que la app te arma sola: recordatorios, avisos de deuda, cancelaciones, invitaciones a cubrir un hueco y reconquista. Usá las variables entre llaves para personalizar cada envío.
       </p>
 
       <div className="space-y-4">
