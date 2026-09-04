@@ -26,11 +26,11 @@ export default function Home() {
       const monthStart = toISODate(new Date(today.getFullYear(), today.getMonth(), 1))
       const monthEnd = toISODate(new Date(today.getFullYear(), today.getMonth() + 1, 0))
 
-      const [{ count: classesToday }, { data: payments }, { data: expenses }, { count: students }, { data: pendingClasses }, { data: tomorrow }, { data: tpl }] =
+      const [{ data: todayClasses }, { data: payments }, { data: expenses }, { count: students }, { data: pendingClasses }, { data: tomorrow }, { data: tpl }] =
         await Promise.all([
           supabase
             .from('classes')
-            .select('id', { count: 'exact', head: true })
+            .select('start_time')
             .eq('profesor_id', user.id)
             .eq('class_date', iso)
             .not('status', 'eq', 'cancelled'),
@@ -56,11 +56,13 @@ export default function Home() {
         ])
 
       if (cancelled) return
+      // "Clases hoy" cuenta horarios únicos (una clase de a 2 no son "2 clases") — no filas.
+      const classesToday = new Set((todayClasses || []).map((c) => c.start_time)).size
       const gain = (payments || []).reduce((s, p) => s + Number(p.amount), 0) - (expenses || []).reduce((s, e) => s + Number(e.amount), 0)
       const debtTotal = (pendingClasses || []).reduce((s, c) => s + Number(c.price || 0), 0)
       const debtorsSet = new Set((pendingClasses || []).map((c) => c.student_id))
 
-      setStats({ classesToday: classesToday || 0, gain, students: students || 0 })
+      setStats({ classesToday, gain, students: students || 0 })
       setDebtInfo({ debtors: debtorsSet.size, total: debtTotal })
       setTomorrowClasses(tomorrow || [])
       setTemplates({ recordatorio: tpl?.[0]?.template || '' })
