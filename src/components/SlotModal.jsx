@@ -324,7 +324,7 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
 
           <div className="grid grid-cols-2 gap-2">
             <button onClick={onClose} className="btn-secondary">Cerrar</button>
-            <button onClick={unblockSlot} disabled={blockSaving} className="btn-primary bg-red-500 hover:bg-red-600">
+            <button onClick={unblockSlot} disabled={blockSaving} className="btn-primary bg-none bg-red-500 hover:bg-red-600">
               {blockSaving ? 'Un momento...' : 'Desbloquear'}
             </button>
           </div>

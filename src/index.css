@@ -45,7 +45,15 @@ html.light .card {
 }
 
 .btn-primary {
-  @apply w-full rounded-full bg-brand text-slate-900 font-bold py-3.5 transition active:scale-[0.98] hover:brightness-110 disabled:opacity-50 disabled:pointer-events-none;
+  @apply w-full rounded-full bg-gradient-to-r from-brand to-brand-2 text-white font-bold py-3.5 transition active:scale-[0.98] hover:brightness-110 disabled:opacity-50 disabled:pointer-events-none;
+}
+
+.text-gradient {
+  @apply bg-gradient-to-r from-brand to-brand-2 bg-clip-text text-transparent;
+}
+
+.bar-gradient {
+  @apply bg-gradient-to-r from-brand to-brand-2;
 }
 
 .btn-secondary {

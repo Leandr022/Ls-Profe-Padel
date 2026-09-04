@@ -16,7 +16,7 @@ export default function Header({ backTo, backLabel = 'Volver' }) {
       )}
       <div className="flex items-center gap-1.5 font-extrabold text-lg">
         <img src="/logo.png" alt="" className="w-6 h-6 rounded-full object-cover" />
-        <span>LsPadel<span className="text-brand">Pro</span></span>
+        <span>LsPadel<span className="text-gradient">Pro</span></span>
       </div>
     </div>
   )

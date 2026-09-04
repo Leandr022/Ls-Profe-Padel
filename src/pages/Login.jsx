@@ -40,7 +40,7 @@ export default function Login() {
     <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
       <img src="/logo.png" alt="LsPadelPro" className="w-24 h-24 rounded-2xl object-cover mb-6 shadow-lg" />
       <h1 className="text-2xl font-extrabold mb-1">
-        LsPadel<span className="text-brand">Pro</span>
+        LsPadel<span className="text-gradient">Pro</span>
       </h1>
       <p className="text-slate-400 text-sm mb-8 max-w-xs">
         Organizá tu semana de clases, tus alumnos y tus cobros en un solo lugar.

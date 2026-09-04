@@ -87,7 +87,7 @@ export default function Home() {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-1.5 font-extrabold text-lg">
           <img src="/logo.png" alt="" className="w-6 h-6 rounded-full object-cover" />
-          <span>LsPadel<span className="text-brand">Pro</span></span>
+          <span>LsPadel<span className="text-gradient">Pro</span></span>
         </div>
         <Link to="/configuracion" className="btn-secondary p-2.5 rounded-full">
           <SettingsIcon />
@@ -99,16 +99,16 @@ export default function Home() {
 
       <div className="label-muted mb-2">Tu día</div>
       <div className="grid grid-cols-3 gap-2.5 mb-4">
-        <div className="card p-4 text-center">
-          <div className="text-2xl font-extrabold text-brand">{loading ? '–' : stats.classesToday}</div>
+        <div className="card p-4 text-center bg-gradient-to-br from-brand/10 via-transparent to-transparent">
+          <div className="text-2xl font-extrabold text-gradient">{loading ? '–' : stats.classesToday}</div>
           <div className="text-[11px] text-slate-400 mt-1">CLASES HOY</div>
         </div>
-        <div className="card p-4 text-center">
-          <div className="text-lg font-extrabold text-brand">{loading ? '–' : formatMoney(stats.gain, profile?.currency)}</div>
+        <div className="card p-4 text-center bg-gradient-to-br from-brand/10 via-transparent to-transparent">
+          <div className="text-lg font-extrabold text-gradient">{loading ? '–' : formatMoney(stats.gain, profile?.currency)}</div>
           <div className="text-[11px] text-slate-400 mt-1">GANANCIA ESTE MES</div>
         </div>
-        <div className="card p-4 text-center">
-          <div className="text-2xl font-extrabold text-brand">{loading ? '–' : stats.students}</div>
+        <div className="card p-4 text-center bg-gradient-to-br from-brand/10 via-transparent to-transparent">
+          <div className="text-2xl font-extrabold text-gradient">{loading ? '–' : stats.students}</div>
           <div className="text-[11px] text-slate-400 mt-1">ALUMNOS</div>
         </div>
       </div>
@@ -163,7 +163,7 @@ export default function Home() {
 
       <div className="label-muted mb-2">Secciones</div>
       <div className="space-y-3">
-        <Link to="/panel" className="card block p-4 bg-gradient-to-br from-brand/15 to-transparent border-brand/30">
+        <Link to="/panel" className="card block p-4 bg-gradient-to-br from-brand/15 via-brand-2/10 to-transparent border-brand/30">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-brand/20 flex items-center justify-center text-brand">
               <CalendarIcon />

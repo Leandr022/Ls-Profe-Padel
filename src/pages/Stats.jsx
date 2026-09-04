@@ -39,7 +39,7 @@ async function monthTotals(userId, monthStart, monthEnd) {
     entry.count += 1
     countByStudent.set(key, entry)
   })
-  const top = [...countByStudent.values()].sort((a, b) => b.count - a.count).slice(0, 3)
+  const top = [...countByStudent.values()].sort((a, b) => b.count - a.count)
 
   // Guía de clases por tamaño de grupo: cuántos alumnos (filas) pagaron individual/dúo/trío/grupo
   // de 4, y cuánto facturaron entre todos — según cuánta gente compartía ese mismo día y horario.
@@ -194,10 +194,10 @@ export default function Stats() {
         </select>
       </div>
 
-      <div className="card p-5 mb-3 bg-gradient-to-br from-brand/10 to-transparent border-brand/20">
-        <div className="w-8 h-1 rounded-full bg-brand mb-3" />
+      <div className="card p-5 mb-3 bg-gradient-to-br from-brand/10 via-brand-2/5 to-transparent border-brand/20">
+        <div className="w-8 h-1 rounded-full bar-gradient mb-3" />
         <div className="label-muted text-brand mb-1">Ganancia del mes</div>
-        <div className="text-3xl font-extrabold">{loading ? '–' : formatMoney(current?.ganancia, profile?.currency)}</div>
+        <div className="text-3xl font-extrabold text-gradient">{loading ? '–' : formatMoney(current?.ganancia, profile?.currency)}</div>
         <div className="text-xs text-slate-500 mt-1">{diffLabel}</div>
       </div>
 
@@ -241,20 +241,15 @@ export default function Stats() {
           <ChevronDown className={`text-slate-500 transition ${showTop ? 'rotate-180' : ''}`} />
         </button>
         {showTop && (
-          <div className="px-4 pb-4 space-y-2">
+          <div className="px-4 pb-4">
+            <p className="text-xs text-slate-500 mb-3">Ranking completo de asistencia — ideal para premiar a quien más vino al terminar el mes.</p>
             {loading && <div className="text-sm text-slate-500">Cargando...</div>}
             {!loading && (compareTotals?.top || []).length === 0 && (
               <div className="text-sm text-slate-500">Sin clases registradas ese mes.</div>
             )}
-            {!loading && (compareTotals?.top || []).map((s, i) => (
-              <div key={s.name + i} className="text-sm flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-violet-500/15 text-violet-400 text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
-                  {s.name}
-                </span>
-                <span className="text-slate-400">{s.count} clase{s.count !== 1 ? 's' : ''}</span>
-              </div>
-            ))}
+            {!loading && (compareTotals?.top || []).length > 0 && (
+              <RankingList ranking={compareTotals.top} />
+            )}
           </div>
         )}
 
@@ -277,6 +272,70 @@ export default function Stats() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+const MEDAL_STYLES = [
+  { badge: 'bg-gradient-to-br from-amber-300 to-amber-500 text-amber-950', bar: 'bg-gradient-to-r from-amber-300 to-amber-500', label: '🥇' },
+  { badge: 'bg-gradient-to-br from-slate-300 to-slate-400 text-slate-900', bar: 'bg-gradient-to-r from-slate-300 to-slate-400', label: '🥈' },
+  { badge: 'bg-gradient-to-br from-orange-400 to-amber-700 text-amber-950', bar: 'bg-gradient-to-r from-orange-400 to-amber-700', label: '🥉' },
+]
+
+function RankingList({ ranking }) {
+  const [showAll, setShowAll] = useState(false)
+  const podium = ranking.slice(0, 3)
+  const rest = ranking.slice(3)
+  const maxCount = Math.max(1, ranking[0]?.count || 1)
+
+  return (
+    <div>
+      {podium.length > 0 && (
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          {[podium[1], podium[0], podium[2]].map((s, i) =>
+            s ? (
+              <div
+                key={s.name + i}
+                className={`rounded-xl bg-bg-card border border-bg-border px-2 py-3 text-center flex flex-col items-center gap-1.5 ${i === 1 ? '-mt-2' : ''}`}
+              >
+                <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-extrabold shrink-0 ${MEDAL_STYLES[i === 1 ? 0 : i === 0 ? 1 : 2].badge}`}>
+                  {MEDAL_STYLES[i === 1 ? 0 : i === 0 ? 1 : 2].label}
+                </span>
+                <span className="text-xs font-semibold leading-tight break-words">{s.name}</span>
+                <span className="text-[11px] text-slate-400">{s.count} clase{s.count !== 1 ? 's' : ''}</span>
+              </div>
+            ) : (
+              <div key={'empty' + i} />
+            )
+          )}
+        </div>
+      )}
+
+      {rest.length > 0 && (
+        <>
+          <div className="space-y-2">
+            {(showAll ? rest : rest.slice(0, 5)).map((s, i) => (
+              <div key={s.name + i} className="text-sm">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-violet-500/15 text-violet-400 text-[10px] font-bold flex items-center justify-center">{i + 4}</span>
+                    {s.name}
+                  </span>
+                  <span className="text-slate-400">{s.count} clase{s.count !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="h-1 rounded-full bg-bg-card overflow-hidden ml-7">
+                  <div className="h-full rounded-full bar-gradient" style={{ width: `${Math.max(4, (s.count / maxCount) * 100)}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          {rest.length > 5 && (
+            <button onClick={() => setShowAll((v) => !v)} className="text-xs text-brand font-semibold mt-3">
+              {showAll ? 'Ver menos' : `Ver ranking completo (${rest.length - 5} más)`}
+            </button>
+          )}
+        </>
+      )}
     </div>
   )
 }
@@ -307,7 +366,7 @@ function BreakdownList({ breakdown, total, currency }) {
                 <span className="text-slate-400">{formatMoney(b.amount, currency)} · {b.count}</span>
               </div>
               <div className="h-1.5 rounded-full bg-bg-card overflow-hidden">
-                <div className="h-full rounded-full bg-brand" style={{ width: `${Math.max(4, (b.amount / maxAmount) * 100)}%` }} />
+                <div className="h-full rounded-full bar-gradient" style={{ width: `${Math.max(4, (b.amount / maxAmount) * 100)}%` }} />
               </div>
             </button>
             {isOpen && (
@@ -340,9 +399,9 @@ function MonthSummaryModal({ current, newStudents, loading, currency, monthName,
         </div>
         <p className="text-xs text-slate-500 mb-4">Facturación, alumnos nuevos y gastos, todo junto.</p>
 
-        <div className="rounded-2xl bg-gradient-to-br from-brand/15 to-transparent border border-brand/20 p-4 mb-3">
+        <div className="rounded-2xl bg-gradient-to-br from-brand/15 via-brand-2/8 to-transparent border border-brand/20 p-4 mb-3">
           <div className="label-muted text-brand mb-1">Ganancia del mes</div>
-          <div className="text-2xl font-extrabold">{loading ? '–' : formatMoney(current?.ganancia, currency)}</div>
+          <div className="text-2xl font-extrabold text-gradient">{loading ? '–' : formatMoney(current?.ganancia, currency)}</div>
         </div>
 
         <div className="card divide-y divide-bg-border mb-3">
