@@ -236,7 +236,7 @@ export default function Stats() {
           <span className="w-8 h-8 rounded-lg bg-violet-500/15 text-violet-400 flex items-center justify-center"><TrophyIcon size={16} /></span>
           <span className="flex-1">
             <span className="font-semibold block">Top asistencia</span>
-            <span className="text-xs text-slate-500">{monthLabel(compareMonth)}</span>
+            <span className="text-xs text-slate-500">{monthLabel(now)}</span>
           </span>
           <ChevronDown className={`text-slate-500 transition ${showTop ? 'rotate-180' : ''}`} />
         </button>
@@ -244,11 +244,11 @@ export default function Stats() {
           <div className="px-4 pb-4">
             <p className="text-xs text-slate-500 mb-3">Ranking completo de asistencia — ideal para premiar a quien más vino al terminar el mes.</p>
             {loading && <div className="text-sm text-slate-500">Cargando...</div>}
-            {!loading && (compareTotals?.top || []).length === 0 && (
-              <div className="text-sm text-slate-500">Sin clases registradas ese mes.</div>
+            {!loading && (current?.top || []).length === 0 && (
+              <div className="text-sm text-slate-500">Sin clases registradas este mes todavía.</div>
             )}
-            {!loading && (compareTotals?.top || []).length > 0 && (
-              <RankingList ranking={compareTotals.top} />
+            {!loading && (current?.top || []).length > 0 && (
+              <RankingList ranking={current.top} />
             )}
           </div>
         )}
