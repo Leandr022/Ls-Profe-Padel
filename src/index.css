@@ -56,6 +56,13 @@ html.light .card {
   @apply bg-gradient-to-r from-brand to-brand-2;
 }
 
+.btn-whatsapp {
+  @apply rounded-full bg-gradient-to-r from-emerald-400/25 to-green-500/25 border border-emerald-400/30 font-semibold text-emerald-300 transition active:scale-[0.98] hover:from-emerald-400/35 hover:to-green-500/35;
+}
+html.light .btn-whatsapp {
+  @apply from-emerald-200 to-green-300 border-emerald-400/40 text-emerald-800;
+}
+
 .btn-secondary {
   @apply rounded-full bg-bg-card border border-bg-border px-4 py-2 text-sm font-semibold text-slate-100 transition active:scale-[0.98] hover:bg-white/5;
 }

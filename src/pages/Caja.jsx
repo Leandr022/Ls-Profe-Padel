@@ -191,7 +191,7 @@ export default function Caja() {
                         target="_blank"
                         rel="noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="btn-secondary flex items-center gap-1 text-amber-400 text-xs"
+                        className="btn-whatsapp flex items-center gap-1 text-xs px-3 py-1.5"
                       >
                         <WhatsAppIcon size={14} /> Avisar
                       </a>

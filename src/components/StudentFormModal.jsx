@@ -177,7 +177,7 @@ function StudentProfile({ student, onClose, onEdit, onChanged }) {
             href={waLink(student.phone, fillTemplate(templates.recordatorio || 'Hola {nombre}!', { nombre: student.name }))}
             target="_blank"
             rel="noreferrer"
-            className="btn-secondary flex items-center justify-center gap-1.5 text-brand"
+            className="btn-whatsapp flex items-center justify-center gap-1.5 py-2"
           >
             <WhatsAppIcon size={16} /> WhatsApp
           </a>
@@ -548,10 +548,10 @@ function StudentEditForm({ student, onClose, onSaved, onCancelEdit }) {
 
         {isEdit && phone && (
           <div className="grid grid-cols-2 gap-2">
-            <a href={waLink(phone, fillTemplate(templates.recordatorio || '', { nombre: name, hora: timeSlot || '' }))} target="_blank" rel="noreferrer" className="btn-secondary flex items-center justify-center gap-1.5 text-brand">
+            <a href={waLink(phone, fillTemplate(templates.recordatorio || '', { nombre: name, hora: timeSlot || '' }))} target="_blank" rel="noreferrer" className="btn-whatsapp flex items-center justify-center gap-1.5 py-2">
               <WhatsAppIcon size={16} /> Recordatorio
             </a>
-            <a href={waLink(phone, fillTemplate(templates.reconquista || '', { nombre: name }))} target="_blank" rel="noreferrer" className="btn-secondary flex items-center justify-center gap-1.5 text-brand">
+            <a href={waLink(phone, fillTemplate(templates.reconquista || '', { nombre: name }))} target="_blank" rel="noreferrer" className="btn-whatsapp flex items-center justify-center gap-1.5 py-2">
               <WhatsAppIcon size={16} /> Reconquista
             </a>
           </div>

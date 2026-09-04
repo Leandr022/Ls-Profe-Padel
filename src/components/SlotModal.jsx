@@ -476,7 +476,7 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
                   <div className="relative">
                     <button
                       onClick={() => setWaMenuForId(waMenuForId === row.id ? null : row.id)}
-                      className="btn-secondary p-2 text-brand flex items-center gap-0.5"
+                      className="btn-whatsapp p-2 flex items-center gap-0.5"
                     >
                       <WhatsAppIcon size={14} />
                       <ChevronDown size={11} />

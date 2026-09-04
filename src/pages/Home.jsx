@@ -229,7 +229,7 @@ function TomorrowModal({ classes, template, onMarkNotified, onClose }) {
                     target="_blank"
                     rel="noreferrer"
                     onClick={() => onMarkNotified(c.id)}
-                    className="btn-secondary flex items-center gap-1.5 text-brand text-xs px-3 py-1.5"
+                    className="btn-whatsapp flex items-center gap-1.5 text-xs px-3 py-1.5"
                   >
                     <WhatsAppIcon size={14} /> Avisar
                   </a>
