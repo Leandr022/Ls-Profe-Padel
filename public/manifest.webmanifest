@@ -1,6 +1,6 @@
 {
-  "name": "Ls-PadelPro",
-  "short_name": "Ls-PadelPro",
+  "name": "LsPadelPro",
+  "short_name": "LsPadelPro",
   "description": "Organizá tus clases de pádel: alumnos, horarios, cobros y estadísticas.",
   "start_url": "/",
   "display": "standalone",

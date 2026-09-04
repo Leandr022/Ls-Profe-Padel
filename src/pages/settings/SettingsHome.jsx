@@ -99,7 +99,7 @@ export default function SettingsHome() {
       />
 
       {profile?.unlimited_access && (
-        <SettingsLink to="/admin" title="Profes registrados" desc="Quiénes se registraron en Ls-PadelPro y en qué estado de acceso están (prueba, plan activo, vencido)." actionLabel="Ver" />
+        <SettingsLink to="/admin" title="Profes registrados" desc="Quiénes se registraron en LsPadelPro y en qué estado de acceso están (prueba, plan activo, vencido)." actionLabel="Ver" />
       )}
 
       <Section title="Soporte">

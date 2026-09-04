@@ -27,7 +27,7 @@ export default async function handler(req, res) {
       res.status(500).json({ error: 'Falta RESEND_API_KEY en las variables de entorno de Vercel.' })
       return
     }
-    const fromAddress = process.env.RESEND_FROM || 'Ls-PadelPro <onboarding@resend.dev>'
+    const fromAddress = process.env.RESEND_FROM || 'LsPadelPro <onboarding@resend.dev>'
     const appUrl = process.env.APP_URL || `https://${req.headers.host}`
 
     const admin = supabaseAdmin()
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
 
       const firstName = (profile.full_name || 'Profe').split(' ')[0]
       const isTrial = access.source === 'trial'
-      const subject = isTrial ? 'Tu prueba gratuita de Ls-PadelPro está por terminar' : 'Tu plan de Ls-PadelPro está por vencer'
+      const subject = isTrial ? 'Tu prueba gratuita de LsPadelPro está por terminar' : 'Tu plan de LsPadelPro está por vencer'
       const daysText = access.daysLeft <= 0 ? 'hoy' : access.daysLeft === 1 ? 'en 1 día' : `en ${access.daysLeft} días`
       const planText = isTrial ? 'tu prueba gratuita' : `tu plan ${planLabel(profile.plan) || profile.plan}`
 
@@ -64,7 +64,7 @@ export default async function handler(req, res) {
         <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; color: #1a1a1a;">
           <h2 style="margin: 0 0 12px;">Hola ${firstName} 👋</h2>
           <p style="font-size: 15px; line-height: 1.5;">
-            Te escribimos porque ${planText} de <strong>Ls-PadelPro</strong> vence ${daysText}.
+            Te escribimos porque ${planText} de <strong>LsPadelPro</strong> vence ${daysText}.
             Para no perder acceso a tu calendario, tus alumnos y tu caja, renovalo cuando quieras desde la app.
           </p>
           <p style="margin: 24px 0;">

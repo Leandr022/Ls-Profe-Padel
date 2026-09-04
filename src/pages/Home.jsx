@@ -87,7 +87,7 @@ export default function Home() {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-1.5 font-extrabold text-lg">
           <img src="/logo.png" alt="" className="w-6 h-6 rounded-full object-cover" />
-          <span>Ls-Padel<span className="text-brand">Pro</span></span>
+          <span>LsPadel<span className="text-brand">Pro</span></span>
         </div>
         <Link to="/configuracion" className="btn-secondary p-2.5 rounded-full">
           <SettingsIcon />
