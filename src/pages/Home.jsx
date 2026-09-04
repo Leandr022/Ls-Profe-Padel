@@ -2,15 +2,19 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { formatMoney, toISODate } from '../lib/helpers'
-import { CalendarIcon, ChevronRight, SettingsIcon } from '../components/Icons'
+import { formatMoney, toISODate, waLink, fillTemplate } from '../lib/helpers'
+import { CalendarIcon, ChevronRight, SettingsIcon, WhatsAppIcon, CloseIcon } from '../components/Icons'
 
 export default function Home() {
   const { user, profile } = useAuth()
   const [stats, setStats] = useState({ classesToday: 0, gain: 0, students: 0 })
   const [debtInfo, setDebtInfo] = useState({ debtors: 0, total: 0 })
-  const [unnotified, setUnnotified] = useState(0)
+  const [tomorrowClasses, setTomorrowClasses] = useState([])
+  const [templates, setTemplates] = useState({})
+  const [showTomorrowModal, setShowTomorrowModal] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  const unnotified = tomorrowClasses.filter((c) => !c.notified).length
 
   useEffect(() => {
     if (!user) return
@@ -22,7 +26,7 @@ export default function Home() {
       const monthStart = toISODate(new Date(today.getFullYear(), today.getMonth(), 1))
       const monthEnd = toISODate(new Date(today.getFullYear(), today.getMonth() + 1, 0))
 
-      const [{ count: classesToday }, { data: payments }, { data: expenses }, { count: students }, { data: pendingClasses }, { data: tomorrowClasses }] =
+      const [{ count: classesToday }, { data: payments }, { data: expenses }, { count: students }, { data: pendingClasses }, { data: tomorrow }, { data: tpl }] =
         await Promise.all([
           supabase
             .from('classes')
@@ -42,10 +46,13 @@ export default function Home() {
             .lte('class_date', iso),
           supabase
             .from('classes')
-            .select('id, student_id, notified, students(name)')
+            .select('id, student_id, notified, start_time, students(name, phone)')
             .eq('profesor_id', user.id)
             .eq('class_date', toISODate(new Date(today.getTime() + 86400000)))
-            .not('student_id', 'is', null),
+            .not('student_id', 'is', null)
+            .not('status', 'eq', 'cancelled')
+            .order('start_time'),
+          supabase.from('message_templates').select('*').eq('profesor_id', user.id).eq('key', 'recordatorio'),
         ])
 
       if (cancelled) return
@@ -55,7 +62,8 @@ export default function Home() {
 
       setStats({ classesToday: classesToday || 0, gain, students: students || 0 })
       setDebtInfo({ debtors: debtorsSet.size, total: debtTotal })
-      setUnnotified((tomorrowClasses || []).filter((c) => !c.notified).length)
+      setTomorrowClasses(tomorrow || [])
+      setTemplates({ recordatorio: tpl?.[0]?.template || '' })
       setLoading(false)
     }
     load()
@@ -63,6 +71,11 @@ export default function Home() {
       cancelled = true
     }
   }, [user])
+
+  async function markNotified(classId) {
+    await supabase.from('classes').update({ notified: true }).eq('id', classId)
+    setTomorrowClasses((prev) => prev.map((c) => (c.id === classId ? { ...c, notified: true } : c)))
+  }
 
   const firstName = profile?.full_name?.split(' ')[0] || 'Profe'
   const todayLabel = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -127,14 +140,23 @@ export default function Home() {
               No tenés a quién avisar →
             </div>
           ) : (
-            <Link
-              to="/panel/calendario"
-              className="block rounded-xl bg-brand/10 border border-brand/30 text-brand text-sm font-semibold text-center py-3 px-4"
+            <button
+              onClick={() => setShowTomorrowModal(true)}
+              className="w-full rounded-xl bg-brand/10 border border-brand/30 text-brand text-sm font-semibold text-center py-3 px-4"
             >
               Avisar a {unnotified} alumno{unnotified > 1 ? 's' : ''} de mañana →
-            </Link>
+            </button>
           )}
         </div>
+      )}
+
+      {showTomorrowModal && (
+        <TomorrowModal
+          classes={tomorrowClasses}
+          template={templates.recordatorio}
+          onMarkNotified={markNotified}
+          onClose={() => setShowTomorrowModal(false)}
+        />
       )}
 
       <div className="label-muted mb-2">Secciones</div>
@@ -175,6 +197,54 @@ export default function Home() {
           </div>
           <span className="text-[10px] font-bold uppercase bg-white/10 px-2 py-1 rounded-full">Próximamente</span>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function TomorrowModal({ classes, template, onMarkNotified, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="card w-full sm:max-w-sm max-h-[85vh] overflow-y-auto rounded-b-none sm:rounded-2xl p-5 fade-in" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-1">
+          <div className="font-bold text-lg">¿Les avisamos de mañana?</div>
+          <button onClick={onClose} className="text-slate-400"><CloseIcon /></button>
+        </div>
+        <p className="text-xs text-slate-500 mb-4">Tocá WhatsApp junto a cada uno — en el orden que quieras.</p>
+
+        <div className="space-y-2.5 mb-4">
+          {classes.length === 0 && <div className="text-sm text-slate-500 text-center py-4">No tenés clases cargadas para mañana.</div>}
+          {classes.map((c) => (
+            <div key={c.id} className="rounded-xl bg-bg-card border border-bg-border px-3.5 py-3 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="font-semibold text-sm truncate">{c.students?.name || 'Alumno'}</div>
+                <div className="text-xs text-slate-500">{c.start_time?.slice(0, 5)}</div>
+              </div>
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                {c.students?.phone ? (
+                  <a
+                    href={waLink(c.students.phone, fillTemplate(template || 'Hola {nombre}! Te espero mañana a las {hora}.', { nombre: c.students.name, hora: c.start_time?.slice(0, 5) || '' }))}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => onMarkNotified(c.id)}
+                    className="btn-secondary flex items-center gap-1.5 text-brand text-xs px-3 py-1.5"
+                  >
+                    <WhatsAppIcon size={14} /> Avisar
+                  </a>
+                ) : (
+                  <span className="text-[11px] text-slate-600">Sin teléfono</span>
+                )}
+                {!c.notified ? (
+                  <button onClick={() => onMarkNotified(c.id)} className="text-[11px] text-slate-500 underline decoration-dotted">Ya le avisé</button>
+                ) : (
+                  <span className="text-[11px] text-brand font-semibold">Ya avisado ✓</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <button onClick={onClose} className="btn-secondary w-full">Cerrar</button>
       </div>
     </div>
   )

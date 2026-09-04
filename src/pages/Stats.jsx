@@ -28,6 +28,9 @@ async function monthTotals(userId, monthStart, monthEnd) {
   const gastos = (expenses || []).reduce((s, e) => s + Number(e.amount || 0), 0)
   const done = classes.filter((c) => c.status !== 'absent')
   const students = new Set(done.map((c) => c.student_id)).size
+  // "Clases dadas" cuenta clases reales (día+horario únicos), no una vez por cada alumno anotado
+  // — un dúo son 2 filas pero 1 sola clase.
+  const clasesDadas = new Set(done.map((c) => `${c.class_date}_${c.start_time}`)).size
 
   const countByStudent = new Map()
   done.forEach((c) => {
@@ -45,15 +48,25 @@ async function monthTotals(userId, monthStart, monthEnd) {
     const key = `${c.class_date}_${c.start_time}`
     sizeByDateTime[key] = (sizeByDateTime[key] || 0) + 1
   })
-  const breakdown = Object.fromEntries(BREAKDOWN_SIZES.map((s) => [s, { count: 0, amount: 0 }]))
+  const breakdown = Object.fromEntries(BREAKDOWN_SIZES.map((s) => [s, { count: 0, amount: 0, classes: [] }]))
   classes.forEach((c) => {
     const key = `${c.class_date}_${c.start_time}`
     const size = sizeKeyFor(sizeByDateTime[key] || 1)
     breakdown[size].count += 1
     breakdown[size].amount += Number(c.price || 0)
+    breakdown[size].classes.push({
+      id: `${c.class_date}_${c.start_time}_${c.student_id}`,
+      name: c.students?.name || 'Alumno',
+      class_date: c.class_date,
+      start_time: c.start_time,
+      price: c.price,
+    })
+  })
+  BREAKDOWN_SIZES.forEach((s) => {
+    breakdown[s].classes.sort((a, b) => (a.class_date + a.start_time).localeCompare(b.class_date + b.start_time))
   })
 
-  return { facturado, comisionClub, pendiente, gastos, ganancia: facturado - comisionClub - gastos, clases: done.length, students, top, breakdown }
+  return { facturado, comisionClub, pendiente, gastos, ganancia: facturado - comisionClub - gastos, clases: clasesDadas, students, top, breakdown }
 }
 
 function monthRange(date) {
@@ -74,6 +87,8 @@ export default function Stats() {
   const [showAttention, setShowAttention] = useState(false)
   const [showTop, setShowTop] = useState(false)
   const [showBreakdown, setShowBreakdown] = useState(false)
+  const [showSummary, setShowSummary] = useState(false)
+  const [newStudents, setNewStudents] = useState(0)
   const [loading, setLoading] = useState(true)
 
   const now = new Date()
@@ -93,7 +108,7 @@ export default function Stats() {
       const [curStart, curEnd] = monthRange(now)
       const [cmpStart, cmpEnd] = monthRange(compareMonth)
 
-      const [cur, cmp, { data: cooling }, { data: debtClasses }] = await Promise.all([
+      const [cur, cmp, { data: cooling }, { data: debtClasses }, { count: newCount }] = await Promise.all([
         monthTotals(user.id, curStart, curEnd),
         monthTotals(user.id, cmpStart, cmpEnd),
         supabase.from('students').select('id, name').eq('profesor_id', user.id).eq('status', 'cooling'),
@@ -104,6 +119,12 @@ export default function Stats() {
           .eq('paid', false)
           .not('student_id', 'is', null)
           .lte('class_date', toISODate(now)),
+        supabase
+          .from('students')
+          .select('id', { count: 'exact', head: true })
+          .eq('profesor_id', user.id)
+          .gte('created_at', curStart.toISOString())
+          .lte('created_at', new Date().toISOString()),
       ])
       if (cancelled) return
       const finishedDebt = (debtClasses || []).filter((c) => isClassFinished(c))
@@ -111,6 +132,7 @@ export default function Stats() {
       setCurrent(cur)
       setCompareTotals(cmp)
       setAttention({ cooling: cooling || [], debtors: debtorNames })
+      setNewStudents(newCount || 0)
       setLoading(false)
     }
     load()
@@ -137,15 +159,27 @@ export default function Stats() {
       <h1 className="text-xl font-extrabold mb-0.5">Estadísticas</h1>
       <p className="text-slate-400 text-sm mb-5">Cómo viene el mes, comparado con el que elijas</p>
 
-      <div className="card p-4 mb-4 bg-brand/10 border-brand/30 flex items-start gap-3">
+      <button onClick={() => setShowSummary(true)} className="w-full card p-4 mb-4 bg-brand/10 border-brand/30 flex items-start gap-3 text-left">
         <span className="w-8 h-8 rounded-lg bg-brand/20 text-brand flex items-center justify-center shrink-0 mt-0.5">
           <CheckCircleIcon size={18} />
         </span>
-        <div>
+        <div className="flex-1">
           <div className="font-bold text-brand text-sm">Tu resumen de {monthLabel(now).split(' ')[0]} ya está listo</div>
           <div className="text-xs text-slate-400 mt-0.5">Facturación, alumnos nuevos, gastos — todo junto, para ver de un vistazo cómo te fue.</div>
         </div>
-      </div>
+        <span className="text-brand shrink-0 mt-1">→</span>
+      </button>
+
+      {showSummary && (
+        <MonthSummaryModal
+          current={current}
+          newStudents={newStudents}
+          loading={loading}
+          currency={profile?.currency}
+          monthName={monthLabel(now)}
+          onClose={() => setShowSummary(false)}
+        />
+      )}
 
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm text-slate-400">Comparar con</span>
@@ -248,24 +282,92 @@ export default function Stats() {
 }
 
 function BreakdownList({ breakdown, total, currency }) {
+  const [openSize, setOpenSize] = useState(null)
   const maxAmount = Math.max(1, ...Object.values(breakdown || {}).map((b) => b.amount))
+
+  function formatClassDate(iso) {
+    const d = new Date(`${iso}T00:00:00`)
+    const text = d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'numeric' })
+    return text.charAt(0).toUpperCase() + text.slice(1)
+  }
+
   return (
     <div className="space-y-3">
       {BREAKDOWN_SIZES.map((size) => {
-        const b = breakdown?.[size] || { count: 0, amount: 0 }
+        const b = breakdown?.[size] || { count: 0, amount: 0, classes: [] }
         if (b.count === 0) return null
+        const isOpen = openSize === size
         return (
           <div key={size}>
-            <div className="flex items-center justify-between text-sm mb-1">
-              <span className="font-semibold">{groupSizeLabel(size)}</span>
-              <span className="text-slate-400">{formatMoney(b.amount, currency)} · {b.count}</span>
-            </div>
-            <div className="h-1.5 rounded-full bg-bg-card overflow-hidden">
-              <div className="h-full rounded-full bg-brand" style={{ width: `${Math.max(4, (b.amount / maxAmount) * 100)}%` }} />
-            </div>
+            <button onClick={() => setOpenSize(isOpen ? null : size)} className="w-full text-left">
+              <div className="flex items-center justify-between text-sm mb-1">
+                <span className="font-semibold flex items-center gap-1">
+                  {groupSizeLabel(size)} <ChevronDown size={12} className={`text-slate-500 transition ${isOpen ? 'rotate-180' : '-rotate-90'}`} />
+                </span>
+                <span className="text-slate-400">{formatMoney(b.amount, currency)} · {b.count}</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-bg-card overflow-hidden">
+                <div className="h-full rounded-full bg-brand" style={{ width: `${Math.max(4, (b.amount / maxAmount) * 100)}%` }} />
+              </div>
+            </button>
+            {isOpen && (
+              <div className="mt-2 space-y-1.5">
+                {b.classes.map((c) => (
+                  <div key={c.id} className="rounded-xl bg-bg-card border border-bg-border px-3 py-2 flex items-center justify-between gap-2 text-xs">
+                    <span className="text-slate-300">
+                      <span className="font-semibold">{c.name}</span>
+                      <span className="text-slate-500"> — {formatClassDate(c.class_date)} · {c.start_time?.slice(0, 5)}</span>
+                    </span>
+                    <span className="text-slate-400 font-semibold shrink-0">{formatMoney(c.price, currency)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function MonthSummaryModal({ current, newStudents, loading, currency, monthName, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="card w-full sm:max-w-md max-h-[88vh] overflow-y-auto rounded-b-none sm:rounded-2xl p-5 fade-in" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-1">
+          <div className="font-bold text-lg">Resumen de {monthName}</div>
+          <button onClick={onClose} className="text-slate-400 text-xl leading-none">✕</button>
+        </div>
+        <p className="text-xs text-slate-500 mb-4">Facturación, alumnos nuevos y gastos, todo junto.</p>
+
+        <div className="rounded-2xl bg-gradient-to-br from-brand/15 to-transparent border border-brand/20 p-4 mb-3">
+          <div className="label-muted text-brand mb-1">Ganancia del mes</div>
+          <div className="text-2xl font-extrabold">{loading ? '–' : formatMoney(current?.ganancia, currency)}</div>
+        </div>
+
+        <div className="card divide-y divide-bg-border mb-3">
+          <SummaryRow label="Facturado" value={loading ? '–' : formatMoney(current?.facturado, currency)} />
+          {current?.comisionClub > 0 && (
+            <SummaryRow label="Comisión al club" value={loading ? '–' : `− ${formatMoney(current?.comisionClub, currency)}`} />
+          )}
+          <SummaryRow label="Pendiente de cobro" value={loading ? '–' : formatMoney(current?.pendiente, currency)} />
+          <SummaryRow label="Gastos" value={loading ? '–' : formatMoney(current?.gastos, currency)} />
+          <SummaryRow label="Clases dadas" value={loading ? '–' : current?.clases} />
+          <SummaryRow label="Alumnos activos" value={loading ? '–' : current?.students} />
+          <SummaryRow label="Alumnos nuevos" value={loading ? '–' : newStudents} />
+        </div>
+
+        <button onClick={onClose} className="btn-secondary w-full">Cerrar</button>
+      </div>
+    </div>
+  )
+}
+
+function SummaryRow({ label, value }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-3 text-sm">
+      <span className="text-slate-400">{label}</span>
+      <span className="font-bold">{value}</span>
     </div>
   )
 }
