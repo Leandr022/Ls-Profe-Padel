@@ -99,7 +99,7 @@ export default function SettingsHome() {
       />
 
       {profile?.unlimited_access && (
-        <SettingsLink to="/admin" title="Profes registrados" desc="Quiénes se registraron en ProfePadel y en qué estado de acceso están (prueba, plan activo, vencido)." actionLabel="Ver" />
+        <SettingsLink to="/admin" title="Profes registrados" desc="Quiénes se registraron en Ls-PadelPro y en qué estado de acceso están (prueba, plan activo, vencido)." actionLabel="Ver" />
       )}
 
       <Section title="Soporte">
@@ -119,15 +119,21 @@ export default function SettingsHome() {
 
       <Section title="Legal">
         <div className="space-y-3">
-          <div className="font-semibold text-sm">Términos y condiciones</div>
-          <div className="font-semibold text-sm">Política de privacidad</div>
+          <Link to="/legal/terminos" className="flex items-center justify-between">
+            <span className="font-semibold text-sm">Términos y condiciones</span>
+            <ChevronRight className="text-slate-500" />
+          </Link>
+          <Link to="/legal/privacidad" className="flex items-center justify-between">
+            <span className="font-semibold text-sm">Política de privacidad</span>
+            <ChevronRight className="text-slate-500" />
+          </Link>
         </div>
       </Section>
 
       <button onClick={signOut} className="w-full rounded-full bg-red-950/50 border border-red-800/40 text-red-400 font-bold py-3.5 mt-4">
         Cerrar sesión
       </button>
-      <div className="text-center text-xs text-slate-600 mt-4">ProfePadel · versión beta</div>
+      <div className="text-center text-xs text-slate-600 mt-4">Versión Beta</div>
     </div>
   )
 }

@@ -6,7 +6,7 @@ import { getAccessStatus } from '../lib/access'
 import Header from '../components/Header'
 
 // Panel solo visible para vos (unlimited_access = true). Muestra todos los profes que se
-// registraron en ProfePadel: en qué estado de acceso están (prueba, plan activo, vencido)
+// registraron en Ls-PadelPro: en qué estado de acceso están (prueba, plan activo, vencido)
 // y hace de "quién estaría contratando el servicio".
 export default function Admin() {
   const { user } = useAuth()
@@ -49,7 +49,7 @@ export default function Admin() {
       <Header backTo="/configuracion" backLabel="Configuración" />
       <h1 className="text-xl font-extrabold mb-0.5">Profes registrados</h1>
       <p className="text-slate-400 text-sm mb-5">
-        Todos los que se crearon una cuenta en ProfePadel, con su estado de acceso actual.
+        Todos los que se crearon una cuenta en Ls-PadelPro, con su estado de acceso actual.
       </p>
 
       <div className="grid grid-cols-3 gap-2 mb-4">

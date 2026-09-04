@@ -38,9 +38,9 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
-      <img src="/logo.png" alt="ProfePadel" className="w-24 h-24 rounded-2xl object-cover mb-6 shadow-lg" />
+      <img src="/logo.png" alt="Ls-PadelPro" className="w-24 h-24 rounded-2xl object-cover mb-6 shadow-lg" />
       <h1 className="text-2xl font-extrabold mb-1">
-        Profe<span className="text-brand">Padel</span>
+        Ls-Padel<span className="text-brand">Pro</span>
       </h1>
       <p className="text-slate-400 text-sm mb-8 max-w-xs">
         Organizá tu semana de clases, tus alumnos y tus cobros en un solo lugar.
@@ -93,7 +93,7 @@ export default function Login() {
       </button>
 
       <p className="text-slate-600 text-xs mt-8 max-w-xs">
-        Al continuar aceptás los Términos y condiciones y la Política de privacidad de ProfePadel.
+        Al continuar aceptás los Términos y condiciones y la Política de privacidad de Ls-PadelPro.
       </p>
     </div>
   )

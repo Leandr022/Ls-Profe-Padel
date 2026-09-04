@@ -19,6 +19,8 @@ import MessagesSettings from './pages/settings/MessagesSettings'
 import DebtSettings from './pages/settings/DebtSettings'
 import PlanSettings from './pages/settings/PlanSettings'
 import Admin from './pages/Admin'
+import Terms from './pages/legal/Terms'
+import Privacy from './pages/legal/Privacy'
 
 function useThemeSync() {
   const { profile } = useAuth()
@@ -94,6 +96,8 @@ export default function App() {
       <Route path="/configuracion/deuda" element={<ProtectedRoute><DebtSettings /></ProtectedRoute>} />
       <Route path="/configuracion/plan" element={<ProtectedRoute><PlanSettings /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute><AdminRoute><Admin /></AdminRoute></ProtectedRoute>} />
+      <Route path="/legal/terminos" element={<ProtectedRoute><Terms /></ProtectedRoute>} />
+      <Route path="/legal/privacidad" element={<ProtectedRoute><Privacy /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

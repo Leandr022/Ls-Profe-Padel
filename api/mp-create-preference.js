@@ -35,7 +35,7 @@ export default async function handler(req, res) {
     const preference = {
       items: [
         {
-          title: `ProfePadel - Plan ${plan.label}`,
+          title: `Ls-PadelPro - Plan ${plan.label}`,
           quantity: 1,
           unit_price: Number(plan.price),
           currency_id: currencyId,

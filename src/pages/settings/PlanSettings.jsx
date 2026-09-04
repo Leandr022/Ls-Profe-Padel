@@ -49,7 +49,7 @@ export default function PlanSettings() {
         <div className="card p-4 mt-4 bg-brand/10 border-brand/30 text-center">
           <div className="text-2xl mb-1">✨</div>
           <div className="font-bold">Acceso ilimitado</div>
-          <p className="text-sm text-slate-400 mt-1">Esta cuenta es la del dueño de ProfePadel — no tiene vencimiento ni límite de plan.</p>
+          <p className="text-sm text-slate-400 mt-1">Esta cuenta es la del dueño de Ls-PadelPro — no tiene vencimiento ni límite de plan.</p>
         </div>
       </div>
     )
@@ -62,7 +62,7 @@ export default function PlanSettings() {
 
       {location.state?.blocked && (
         <div className="card p-3 mb-4 bg-red-950/40 border-red-800/40 text-red-400 text-sm font-semibold text-center">
-          {access.source === 'trial' ? 'Tu prueba gratuita terminó.' : 'Tu plan venció.'} Elegí uno para seguir usando ProfePadel.
+          {access.source === 'trial' ? 'Tu prueba gratuita terminó.' : 'Tu plan venció.'} Elegí uno para seguir usando Ls-PadelPro.
         </div>
       )}
 
@@ -141,7 +141,7 @@ export default function PlanSettings() {
       <div className="card p-4 mb-4">
         <div className="font-bold">Personalizado</div>
         <div className="text-xs text-slate-400 mb-3">Para academias y clubes con múltiples profesores.</div>
-        <a href="mailto:leandro.santagada@icloud.com?subject=Plan personalizado ProfePadel" className="btn-secondary block text-center">
+        <a href="mailto:leandro.santagada@icloud.com?subject=Plan personalizado Ls-PadelPro" className="btn-secondary block text-center">
           Contáctanos
         </a>
       </div>

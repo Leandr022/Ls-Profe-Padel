@@ -1,4 +1,4 @@
-// Configuración de planes de ProfePadel.
+// Configuración de planes de Ls-PadelPro.
 // Hoy vive acá, hardcodeada — el día que exista un panel de admin,
 // esto se reemplaza por una tabla `plans` editable y este archivo
 // pasa a ser solo el tipo/fallback. La forma de cada plan (key, label,
