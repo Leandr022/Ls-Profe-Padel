@@ -12,6 +12,7 @@ import {
   LEVEL_MODS,
   PERIODS,
   categoryLabel,
+  MESSAGE_DEFAULTS,
 } from '../lib/helpers'
 import { CloseIcon, WhatsAppIcon, CheckCircleIcon, WarningIcon, PlusIcon } from './Icons'
 
@@ -174,7 +175,7 @@ function StudentProfile({ student, onClose, onEdit, onChanged }) {
       <div className="grid grid-cols-2 gap-2 mb-4">
         {student.phone ? (
           <a
-            href={waLink(student.phone, fillTemplate(templates.recordatorio || 'Hola {nombre}!', { nombre: student.name }))}
+            href={waLink(student.phone, fillTemplate(templates.recordatorio || MESSAGE_DEFAULTS.recordatorio, { nombre: student.name, fecha: '', hora: '' }))}
             target="_blank"
             rel="noreferrer"
             className="btn-whatsapp flex items-center justify-center gap-1.5 py-2"
@@ -548,10 +549,10 @@ function StudentEditForm({ student, onClose, onSaved, onCancelEdit }) {
 
         {isEdit && phone && (
           <div className="grid grid-cols-2 gap-2">
-            <a href={waLink(phone, fillTemplate(templates.recordatorio || '', { nombre: name, hora: timeSlot || '' }))} target="_blank" rel="noreferrer" className="btn-whatsapp flex items-center justify-center gap-1.5 py-2">
+            <a href={waLink(phone, fillTemplate(templates.recordatorio || MESSAGE_DEFAULTS.recordatorio, { nombre: name, fecha: '', hora: timeSlot || '' }))} target="_blank" rel="noreferrer" className="btn-whatsapp flex items-center justify-center gap-1.5 py-2">
               <WhatsAppIcon size={16} /> Recordatorio
             </a>
-            <a href={waLink(phone, fillTemplate(templates.reconquista || '', { nombre: name }))} target="_blank" rel="noreferrer" className="btn-whatsapp flex items-center justify-center gap-1.5 py-2">
+            <a href={waLink(phone, fillTemplate(templates.reconquista || MESSAGE_DEFAULTS.reconquista, { nombre: name, hueco: '' }))} target="_blank" rel="noreferrer" className="btn-whatsapp flex items-center justify-center gap-1.5 py-2">
               <WhatsAppIcon size={16} /> Reconquista
             </a>
           </div>

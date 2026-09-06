@@ -13,6 +13,7 @@ import {
   priceForSize,
   commissionForSize,
   DAY_NAMES_FULL,
+  MESSAGE_DEFAULTS,
 } from '../lib/helpers'
 import { CloseIcon, WhatsAppIcon, PlusIcon, WarningIcon, LockIcon, ChevronDown } from './Icons'
 
@@ -37,6 +38,11 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
   const [removeChoiceForId, setRemoveChoiceForId] = useState(null)
 
   const dayIdx = slot.dayIdx ?? jsDayToIdx(new Date(slot.iso + 'T12:00:00').getDay())
+  const slotDateLabel = (() => {
+    const d = new Date(`${slot.iso}T00:00:00`)
+    const text = d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'numeric' })
+    return text.charAt(0).toUpperCase() + text.slice(1)
+  })()
 
   async function loadAll() {
     if (!user) return
@@ -484,7 +490,7 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
                     {waMenuForId === row.id && (
                       <div className="absolute top-full left-0 mt-1 card z-10 divide-y divide-bg-border overflow-hidden w-52">
                         <a
-                          href={waLink(row.students.phone, fillTemplate(templates.recordatorio || 'Hola {nombre}! Te espero a las {hora}.', { nombre: row.students.name, hora: slot.time }))}
+                          href={waLink(row.students.phone, fillTemplate(templates.recordatorio || MESSAGE_DEFAULTS.recordatorio, { nombre: row.students.name, fecha: slotDateLabel, hora: slot.time }))}
                           target="_blank"
                           rel="noreferrer"
                           onClick={() => {
@@ -499,11 +505,11 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
                           <a
                             href={waLink(
                               row.students.phone,
-                              fillTemplate(templates.deuda || 'Hola {nombre}! Te escribo por un pago pendiente de {monto}.', {
+                              fillTemplate(templates.cobro_clase || MESSAGE_DEFAULTS.cobro_clase, {
                                 nombre: row.students.name,
-                                monto: formatMoney(row.price, profile?.currency),
+                                fecha: slotDateLabel,
+                                importe: formatMoney(row.price, profile?.currency),
                                 alias: profile?.payment_alias || '[Tu alias]',
-                                cbu: profile?.payment_cbu_cvu || '[Tu CBU/CVU]',
                               }),
                             )}
                             target="_blank"
@@ -517,7 +523,7 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
                         <a
                           href={waLink(
                             row.students.phone,
-                            fillTemplate(templates.cancelacion || 'Hola {nombre}! Te escribo para avisarte que se cancela la clase de las {hora} de este {dia}.', {
+                            fillTemplate(templates.cancelacion || MESSAGE_DEFAULTS.cancelacion, {
                               nombre: row.students.name,
                               hora: slot.time,
                               dia: DAY_NAMES_FULL[dayIdx],

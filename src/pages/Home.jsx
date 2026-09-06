@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { formatMoney, toISODate, waLink, fillTemplate } from '../lib/helpers'
+import { formatMoney, toISODate, waLink, fillTemplate, MESSAGE_DEFAULTS } from '../lib/helpers'
 import { CalendarIcon, ChevronRight, SettingsIcon, WhatsAppIcon, CloseIcon } from '../components/Icons'
 
 export default function Home() {
@@ -225,7 +225,7 @@ function TomorrowModal({ classes, template, onMarkNotified, onClose }) {
               <div className="flex flex-col items-end gap-1 shrink-0">
                 {c.students?.phone ? (
                   <a
-                    href={waLink(c.students.phone, fillTemplate(template || 'Hola {nombre}! Te espero mañana a las {hora}.', { nombre: c.students.name, hora: c.start_time?.slice(0, 5) || '' }))}
+                    href={waLink(c.students.phone, fillTemplate(template || MESSAGE_DEFAULTS.recordatorio, { nombre: c.students.name, fecha: 'mañana', hora: c.start_time?.slice(0, 5) || '' }))}
                     target="_blank"
                     rel="noreferrer"
                     onClick={() => onMarkNotified(c.id)}

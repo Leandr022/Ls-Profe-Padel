@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { formatMoney, monthLabel, toISODate, waLink, fillTemplate, sizeKeyFor, groupSizeLabel, isClassFinished } from '../lib/helpers'
+import { formatMoney, monthLabel, toISODate, waLink, fillTemplate, sizeKeyFor, groupSizeLabel, isClassFinished, MESSAGE_DEFAULTS } from '../lib/helpers'
 import Header from '../components/Header'
 import { ChevronLeft, ChevronRight, ChevronRight as Chev, WhatsAppIcon, PlusIcon, CloseIcon, CheckCircleIcon } from '../components/Icons'
 
@@ -111,6 +111,26 @@ export default function Caja() {
     return text.charAt(0).toUpperCase() + text.slice(1)
   }
 
+  // Una sola clase sin pagar -> plantilla "una clase" (con la fecha).
+  // Dos o más -> plantilla de "total pendiente" (sin fecha puntual).
+  function debtMessageFor(d) {
+    const alias = profile?.payment_alias || '[Tu alias]'
+    const importe = formatMoney(d.total, profile?.currency)
+    if (d.classes.length === 1) {
+      return fillTemplate(templates.cobro_clase || MESSAGE_DEFAULTS.cobro_clase, {
+        nombre: d.student.name,
+        fecha: formatClassDate(d.classes[0].class_date),
+        alias,
+        importe,
+      })
+    }
+    return fillTemplate(templates.cobro_pendiente || MESSAGE_DEFAULTS.cobro_pendiente, {
+      nombre: d.student.name,
+      alias,
+      importe,
+    })
+  }
+
   return (
     <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 fade-in">
       <Header backTo="/panel" backLabel="Panel" />
@@ -179,15 +199,7 @@ export default function Caja() {
                   <div className="flex items-center gap-2 shrink-0">
                     {d.student?.phone && (
                       <a
-                        href={waLink(
-                          d.student.phone,
-                          fillTemplate(templates.deuda || '', {
-                            nombre: d.student.name,
-                            monto: formatMoney(d.total, profile?.currency),
-                            alias: profile?.payment_alias || '[Tu alias]',
-                            cbu: profile?.payment_cbu_cvu || '[Tu CBU/CVU]',
-                          }),
-                        )}
+                        href={waLink(d.student.phone, debtMessageFor(d))}
                         target="_blank"
                         rel="noreferrer"
                         onClick={(e) => e.stopPropagation()}

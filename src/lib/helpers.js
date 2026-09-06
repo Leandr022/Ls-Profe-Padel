@@ -122,5 +122,20 @@ export function waLink(phone, text) {
 }
 
 export function fillTemplate(template, vars) {
-  return template.replace(/\{(\w+)\}/g, (_, key) => (vars[key] ?? `{${key}}`))
+  return (template || '')
+    .replace(/\{(\w+)\}/g, (_, key) => (vars[key] ?? `{${key}}`))
+    .replace(/\[(\w+)\]/g, (_, key) => (vars[key] ?? `[${key}]`))
+}
+
+// Plantillas de WhatsApp por defecto — usadas como texto base en "Mis mensajes"
+// y como respaldo en cualquier pantalla que arme un mensaje, hasta que el profe
+// las guarde con su propia redacción.
+export const MESSAGE_DEFAULTS = {
+  recordatorio: 'Hola [nombre], cómo estás? Te espero [fecha] a las [hora] 📍',
+  invitacion_hueco: 'Hola [nombre], cómo estás? [dia] tengo un lugar libre en mi clase de las [hora]. Te gustaria venir? 🚀',
+  reconquista: 'Hola [nombre], cómo estás? Hace un tiempo que no entrenamos. [hueco]Si tenés ganas de volver, avisame 👋',
+  cancelacion: 'Hola [nombre]! Te escribo para avisarte que se cancela la clase de las [hora] de este [dia].',
+  cobro_mensual: 'Hola [nombre]! Te paso el alias para [periodo] 👀\n[alias]\nSon [importe]',
+  cobro_clase: 'Hola [nombre]! Te paso el alias por la clase del [fecha] 👀\n[alias]\nSon [importe]',
+  cobro_pendiente: 'Hola [nombre]! Te paso el alias por tus clases pendientes 👀\n[alias]\nEl total es [importe]',
 }
