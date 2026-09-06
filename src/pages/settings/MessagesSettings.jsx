@@ -151,7 +151,7 @@ export default function MessagesSettings() {
 
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-bg/95 backdrop-blur-sm border-t border-bg-border">
         <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto">
-          <button onClick={saveAll} disabled={saving || loading} className="btn-whatsapp-primary">
+          <button onClick={saveAll} disabled={saving || loading} className="btn-primary">
             {saving ? 'Guardando...' : saved ? 'Guardado ✓' : 'Guardar mensajes'}
           </button>
         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import {
@@ -85,8 +85,10 @@ function buildOccupancy(hours, classes, blocks, defaultDuration) {
 export default function Calendar() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const initialDate = location.state?.targetDate ? new Date(`${location.state.targetDate}T12:00:00`) : new Date()
   const [view, setView] = useState('dia')
-  const [cursor, setCursor] = useState(new Date())
+  const [cursor, setCursor] = useState(initialDate)
   const [workingDays, setWorkingDays] = useState([])
   const [slots, setSlots] = useState([])
   const [classesMap, setClassesMap] = useState({}) // iso -> [{...class, students:{name}}]

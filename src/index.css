@@ -63,10 +63,6 @@ html.light .btn-whatsapp {
   @apply from-emerald-200 to-green-300 border-emerald-400/40 text-emerald-800;
 }
 
-.btn-whatsapp-primary {
-  @apply w-full rounded-full bg-gradient-to-r from-emerald-400 to-green-500 text-emerald-950 font-bold py-3.5 transition active:scale-[0.98] hover:brightness-110 disabled:opacity-50 disabled:pointer-events-none;
-}
-
 .wa-bubble {
   @apply bg-emerald-800/80 text-emerald-50 rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-sm whitespace-pre-wrap leading-snug;
 }

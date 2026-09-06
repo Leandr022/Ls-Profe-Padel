@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { formatMoney, toISODate, waLink, fillTemplate, MESSAGE_DEFAULTS } from '../lib/helpers'
+import { formatMoney, toISODate, waLink, fillTemplate, isClassFinished, categoryLabel, MESSAGE_DEFAULTS } from '../lib/helpers'
 import { CalendarIcon, ChevronRight, SettingsIcon, WhatsAppIcon, CloseIcon } from '../components/Icons'
 
 export default function Home() {
@@ -12,6 +12,7 @@ export default function Home() {
   const [tomorrowClasses, setTomorrowClasses] = useState([])
   const [templates, setTemplates] = useState({})
   const [showTomorrowModal, setShowTomorrowModal] = useState(false)
+  const [showWhoNotComing, setShowWhoNotComing] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const unnotified = tomorrowClasses.filter((c) => !c.notified).length
@@ -119,9 +120,9 @@ export default function Home() {
         </p>
       )}
 
-      <Link to="/panel/alumnos" className="btn-secondary w-full flex items-center justify-center gap-1 mb-4 py-3">
+      <button onClick={() => setShowWhoNotComing(true)} className="btn-secondary w-full flex items-center justify-center gap-1 mb-4 py-3">
         ¿Quién no viene? →
-      </Link>
+      </button>
 
       {!loading && (
         <div className="space-y-2 mb-6">
@@ -160,6 +161,8 @@ export default function Home() {
           onClose={() => setShowTomorrowModal(false)}
         />
       )}
+
+      {showWhoNotComing && <WhoNotComingModal userId={user.id} onClose={() => setShowWhoNotComing(false)} />}
 
       <div className="label-muted mb-2">Secciones</div>
       <div className="space-y-3">
@@ -245,6 +248,145 @@ function TomorrowModal({ classes, template, onMarkNotified, onClose }) {
             </div>
           ))}
         </div>
+
+        <button onClick={onClose} className="btn-secondary w-full">Cerrar</button>
+      </div>
+    </div>
+  )
+}
+
+function WhoNotComingModal({ userId, onClose }) {
+  const navigate = useNavigate()
+  const [loading, setLoading] = useState(true)
+  const [groups, setGroups] = useState([])
+  const [dayLabel, setDayLabel] = useState('')
+  const [targetISO, setTargetISO] = useState(null)
+  const [isFallback, setIsFallback] = useState(false)
+  const [saving, setSaving] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      const today = new Date()
+      const rangeStart = toISODate(today)
+      const rangeEnd = toISODate(new Date(today.getTime() + 6 * 86400000))
+      const { data } = await supabase
+        .from('classes')
+        .select('id, student_id, class_date, start_time, end_time, status, students(name, category, category_level)')
+        .eq('profesor_id', userId)
+        .gte('class_date', rangeStart)
+        .lte('class_date', rangeEnd)
+        .not('student_id', 'is', null)
+        .not('status', 'eq', 'cancelled')
+        .order('class_date')
+        .order('start_time')
+
+      if (cancelled) return
+      const byDate = {}
+      ;(data || []).forEach((c) => {
+        if (!byDate[c.class_date]) byDate[c.class_date] = []
+        byDate[c.class_date].push(c)
+      })
+      const todayISO = toISODate(today)
+      let foundISO = null
+      let foundClasses = []
+      for (const iso of Object.keys(byDate).sort()) {
+        const remaining = byDate[iso].filter((c) => !isClassFinished(c))
+        if (remaining.length > 0) {
+          foundISO = iso
+          foundClasses = remaining
+          break
+        }
+      }
+      if (foundISO) {
+        const byTime = {}
+        foundClasses.forEach((c) => {
+          const t = c.start_time?.slice(0, 5) || ''
+          if (!byTime[t]) byTime[t] = []
+          byTime[t].push(c)
+        })
+        const sortedGroups = Object.keys(byTime).sort().map((time) => ({ time, classes: byTime[time] }))
+        const label = new Date(`${foundISO}T00:00:00`).toLocaleDateString('es-AR', { weekday: 'long' })
+        setGroups(sortedGroups)
+        setDayLabel(label.charAt(0).toUpperCase() + label.slice(1))
+        setTargetISO(foundISO)
+        setIsFallback(foundISO !== todayISO)
+      } else {
+        setGroups([])
+        setTargetISO(null)
+      }
+      setLoading(false)
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
+
+  async function toggleStatus(row) {
+    setSaving(row.id)
+    const nextStatus = row.status === 'absent' ? 'scheduled' : 'absent'
+    await supabase.from('classes').update({ status: nextStatus }).eq('id', row.id)
+    setGroups((gs) => gs.map((g) => ({ ...g, classes: g.classes.map((c) => (c.id === row.id ? { ...c, status: nextStatus } : c)) })))
+    setSaving(null)
+  }
+
+  function goToDay() {
+    onClose()
+    navigate('/panel/calendario', { state: { targetDate: targetISO } })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="card w-full sm:max-w-sm max-h-[85vh] overflow-y-auto rounded-b-none sm:rounded-2xl p-5 fade-in" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-1">
+          <div className="font-bold text-lg">¿Quién no viene?</div>
+          <button onClick={onClose} className="text-slate-400"><CloseIcon /></button>
+        </div>
+        <p className="text-xs text-slate-500">Tocá la etiqueta para marcar que un alumno no viene.</p>
+        {isFallback && (
+          <p className="text-xs text-slate-500 mt-1">Ya no queda nada hoy, así que sumamos también {dayLabel.toLowerCase()}.</p>
+        )}
+
+        {loading && <div className="text-sm text-slate-500 text-center py-6">Cargando...</div>}
+
+        {!loading && groups.length === 0 && (
+          <div className="text-sm text-slate-500 text-center py-6">No tenés más clases cargadas para los próximos días.</div>
+        )}
+
+        {!loading && groups.length > 0 && (
+          <>
+            <div className="text-sm font-bold mt-4 mb-2">{dayLabel}</div>
+            <div className="space-y-2.5 mb-4">
+              {groups.map((g) => (
+                <div key={g.time} className="rounded-xl bg-bg-card border border-bg-border px-3.5 py-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-slate-400">{g.time}</span>
+                    <button onClick={goToDay} className="text-xs text-brand font-semibold">Ver ese día →</button>
+                  </div>
+                  <div className="space-y-2">
+                    {g.classes.map((c) => (
+                      <div key={c.id} className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-semibold truncate">
+                          {c.students?.name || 'Alumno'}
+                          {c.students?.category && <span className="text-slate-500 font-normal"> / {categoryLabel(c.students.category, c.students.category_level)}</span>}
+                        </span>
+                        <button
+                          onClick={() => toggleStatus(c)}
+                          disabled={saving === c.id}
+                          className={`pill text-xs font-semibold shrink-0 ${c.status === 'absent' ? 'bg-amber-500/20 text-amber-400' : 'bg-brand/15 text-brand'}`}
+                        >
+                          {c.status === 'absent' ? 'No viene' : 'Viene ✓'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         <button onClick={onClose} className="btn-secondary w-full">Cerrar</button>
       </div>
