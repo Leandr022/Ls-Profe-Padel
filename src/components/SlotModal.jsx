@@ -61,7 +61,14 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
 
     const ids = (slot.existingClasses || []).map((c) => c.student_id).filter(Boolean)
     if (ids.length) {
-      const { data: unpaid } = await supabase.from('classes').select('student_id').eq('profesor_id', user.id).eq('paid', false).in('student_id', ids).lt('class_date', slot.iso)
+      const { data: unpaid } = await supabase
+        .from('classes')
+        .select('student_id')
+        .eq('profesor_id', user.id)
+        .eq('paid', false)
+        .not('status', 'eq', 'cancelled')
+        .in('student_id', ids)
+        .lt('class_date', slot.iso)
       setDebtIds(new Set((unpaid || []).map((u) => u.student_id)))
     }
   }

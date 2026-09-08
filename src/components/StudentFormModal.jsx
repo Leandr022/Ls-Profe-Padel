@@ -73,7 +73,7 @@ function StudentProfile({ student, onClose, onEdit, onChanged }) {
             : Promise.resolve({ data: null }),
           supabase.from('classes').select('id, status').eq('student_id', student.id).gte('class_date', iso(monthStart)).lte('class_date', iso(now)),
           supabase.from('classes').select('id, status').eq('student_id', student.id).gte('class_date', iso(prevMonthStart)).lte('class_date', iso(prevMonthEnd)),
-          supabase.from('classes').select('id').eq('student_id', student.id).eq('paid', false).lte('class_date', iso(now)),
+          supabase.from('classes').select('id').eq('student_id', student.id).eq('paid', false).not('status', 'eq', 'cancelled').lte('class_date', iso(now)),
           supabase.from('payments').select('amount').eq('student_id', student.id),
         ])
 

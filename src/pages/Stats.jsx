@@ -118,6 +118,7 @@ export default function Stats() {
           .eq('profesor_id', user.id)
           .eq('paid', false)
           .not('student_id', 'is', null)
+          .not('status', 'eq', 'cancelled')
           .lte('class_date', toISODate(now)),
         supabase
           .from('students')

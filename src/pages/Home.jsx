@@ -3,12 +3,14 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatMoney, toISODate, waLink, fillTemplate, isClassFinished, categoryLabel, MESSAGE_DEFAULTS } from '../lib/helpers'
-import { CalendarIcon, ChevronRight, SettingsIcon, WhatsAppIcon, CloseIcon } from '../components/Icons'
+import { CalendarIcon, ChevronRight, SettingsIcon, WhatsAppIcon, CloseIcon, CheckCircleIcon } from '../components/Icons'
 
 export default function Home() {
   const { user, profile } = useAuth()
   const [stats, setStats] = useState({ classesToday: 0, gain: 0, students: 0 })
   const [debtInfo, setDebtInfo] = useState({ debtors: 0, total: 0 })
+  const [debtClasses, setDebtClasses] = useState([])
+  const [showDebtModal, setShowDebtModal] = useState(false)
   const [tomorrowClasses, setTomorrowClasses] = useState([])
   const [templates, setTemplates] = useState({})
   const [showTomorrowModal, setShowTomorrowModal] = useState(false)
@@ -40,11 +42,14 @@ export default function Home() {
           supabase.from('students').select('id', { count: 'exact', head: true }).eq('profesor_id', user.id).eq('status', 'active'),
           supabase
             .from('classes')
-            .select('id, price, paid, student_id')
+            .select('id, price, paid, student_id, class_date, start_time, students(name, phone)')
             .eq('profesor_id', user.id)
             .eq('paid', false)
             .not('student_id', 'is', null)
-            .lte('class_date', iso),
+            .not('status', 'eq', 'cancelled')
+            .lte('class_date', iso)
+            .order('class_date')
+            .order('start_time'),
           supabase
             .from('classes')
             .select('id, student_id, notified, start_time, students(name, phone)')
@@ -53,7 +58,7 @@ export default function Home() {
             .not('student_id', 'is', null)
             .not('status', 'eq', 'cancelled')
             .order('start_time'),
-          supabase.from('message_templates').select('*').eq('profesor_id', user.id).eq('key', 'recordatorio'),
+          supabase.from('message_templates').select('*').eq('profesor_id', user.id),
         ])
 
       if (cancelled) return
@@ -65,8 +70,11 @@ export default function Home() {
 
       setStats({ classesToday, gain, students: students || 0 })
       setDebtInfo({ debtors: debtorsSet.size, total: debtTotal })
+      setDebtClasses(pendingClasses || [])
       setTomorrowClasses(tomorrow || [])
-      setTemplates({ recordatorio: tpl?.[0]?.template || '' })
+      const tplMap = {}
+      ;(tpl || []).forEach((t) => (tplMap[t.key] = t.template))
+      setTemplates(tplMap)
       setLoading(false)
     }
     load()
@@ -78,6 +86,17 @@ export default function Home() {
   async function markNotified(classId) {
     await supabase.from('classes').update({ notified: true }).eq('id', classId)
     setTomorrowClasses((prev) => prev.map((c) => (c.id === classId ? { ...c, notified: true } : c)))
+  }
+
+  async function markDebtPaid(classId) {
+    await supabase.from('classes').update({ paid: true }).eq('id', classId)
+    setDebtClasses((prev) => {
+      const next = prev.filter((c) => c.id !== classId)
+      const debtTotal = next.reduce((s, c) => s + Number(c.price || 0), 0)
+      const debtorsSet = new Set(next.map((c) => c.student_id))
+      setDebtInfo({ debtors: debtorsSet.size, total: debtTotal })
+      return next
+    })
   }
 
   const firstName = profile?.full_name?.split(' ')[0] || 'Profe'
@@ -131,12 +150,12 @@ export default function Home() {
               Estás al día con los cobros.
             </div>
           ) : (
-            <Link
-              to="/panel/caja"
-              className="block rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm font-semibold text-center py-3 px-4"
+            <button
+              onClick={() => setShowDebtModal(true)}
+              className="w-full rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm font-semibold text-center py-3 px-4"
             >
               {debtInfo.debtors} alumno{debtInfo.debtors > 1 ? 's' : ''} te debe{debtInfo.debtors > 1 ? 'n' : ''} {formatMoney(debtInfo.total, profile?.currency)} →
-            </Link>
+            </button>
           )}
           {unnotified === 0 ? (
             <div className="rounded-xl bg-brand/10 border border-brand/30 text-brand text-sm font-semibold text-center py-3 px-4">
@@ -163,6 +182,17 @@ export default function Home() {
       )}
 
       {showWhoNotComing && <WhoNotComingModal userId={user.id} onClose={() => setShowWhoNotComing(false)} />}
+
+      {showDebtModal && (
+        <DebtModal
+          classes={debtClasses}
+          currency={profile?.currency}
+          templates={templates}
+          profile={profile}
+          onMarkPaid={markDebtPaid}
+          onClose={() => setShowDebtModal(false)}
+        />
+      )}
 
       <div className="label-muted mb-2">Secciones</div>
       <div className="space-y-3">
@@ -247,6 +277,113 @@ function TomorrowModal({ classes, template, onMarkNotified, onClose }) {
               </div>
             </div>
           ))}
+        </div>
+
+        <button onClick={onClose} className="btn-secondary w-full">Cerrar</button>
+      </div>
+    </div>
+  )
+}
+
+function formatClassDate(iso) {
+  const d = new Date(`${iso}T00:00:00`)
+  const text = d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'numeric' })
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
+function DebtModal({ classes, currency, templates, profile, onMarkPaid, onClose }) {
+  const [expandedId, setExpandedId] = useState(null)
+  const [payingId, setPayingId] = useState(null)
+
+  const byStudent = (() => {
+    const map = {}
+    classes.forEach((c) => {
+      const id = c.student_id
+      if (!map[id]) map[id] = { student: c.students, total: 0, classes: [] }
+      map[id].total += Number(c.price || 0)
+      map[id].classes.push(c)
+    })
+    return Object.values(map)
+  })()
+
+  function debtMessageFor(d) {
+    const alias = profile?.payment_alias || '[Tu alias]'
+    const importe = formatMoney(d.total, currency)
+    if (d.classes.length === 1) {
+      return fillTemplate(templates.cobro_clase || MESSAGE_DEFAULTS.cobro_clase, {
+        nombre: d.student?.name,
+        fecha: formatClassDate(d.classes[0].class_date),
+        alias,
+        importe,
+      })
+    }
+    return fillTemplate(templates.cobro_pendiente || MESSAGE_DEFAULTS.cobro_pendiente, { nombre: d.student?.name, alias, importe })
+  }
+
+  async function handleMarkPaid(classId) {
+    setPayingId(classId)
+    await onMarkPaid(classId)
+    setPayingId(null)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="card w-full sm:max-w-sm max-h-[85vh] overflow-y-auto rounded-b-none sm:rounded-2xl p-5 fade-in" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-1">
+          <div className="font-bold text-lg">¿Quién te debe?</div>
+          <button onClick={onClose} className="text-slate-400"><CloseIcon /></button>
+        </div>
+        <p className="text-xs text-slate-500 mb-4">Tocá a un alumno para ver el detalle de cada clase.</p>
+
+        <div className="space-y-2.5 mb-4">
+          {byStudent.length === 0 && <div className="text-sm text-slate-500 text-center py-4">Nadie te debe hasta hoy.</div>}
+          {byStudent.map((d) => {
+            const isOpen = expandedId === d.student?.id
+            return (
+              <div key={d.student?.id} className="rounded-xl bg-bg-card border border-bg-border overflow-hidden">
+                <button onClick={() => setExpandedId(isOpen ? null : d.student?.id)} className="w-full p-3.5 flex items-center justify-between text-left">
+                  <div>
+                    <div className="font-semibold text-sm">{d.student?.name}</div>
+                    <div className="text-xs text-slate-400">
+                      {d.classes.length} clase{d.classes.length === 1 ? '' : 's'} sin pagar · {formatMoney(d.total, currency)}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {d.student?.phone && (
+                      <a
+                        href={waLink(d.student.phone, debtMessageFor(d))}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="btn-whatsapp flex items-center gap-1 text-xs px-3 py-1.5"
+                      >
+                        <WhatsAppIcon size={14} /> Avisar
+                      </a>
+                    )}
+                  </div>
+                </button>
+                {isOpen && (
+                  <div className="px-3.5 pb-3.5 space-y-1.5">
+                    {d.classes.map((c) => (
+                      <div key={c.id} className="rounded-lg bg-bg border border-bg-border px-3 py-2 flex items-center justify-between gap-2">
+                        <div className="text-xs text-slate-300">
+                          <span className="font-semibold">{formatClassDate(c.class_date)} · {c.start_time?.slice(0, 5)}</span>
+                          <span className="text-slate-500"> — {formatMoney(c.price, currency)}</span>
+                        </div>
+                        <button
+                          onClick={() => handleMarkPaid(c.id)}
+                          disabled={payingId === c.id}
+                          className="shrink-0 flex items-center gap-1 text-[11px] font-bold text-brand bg-brand/10 rounded-full px-2.5 py-1"
+                        >
+                          <CheckCircleIcon size={12} /> Pagó
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
 
         <button onClick={onClose} className="btn-secondary w-full">Cerrar</button>
