@@ -24,9 +24,9 @@ const GROUP_SIZES = [
   { key: 'mensual', label: 'Mensual' },
 ]
 
-export default function StudentFormModal({ student, onClose, onSaved }) {
+export default function StudentFormModal({ student, onClose, onSaved, startInEdit }) {
   const isEdit = !!student
-  const [mode, setMode] = useState(isEdit ? 'view' : 'edit')
+  const [mode, setMode] = useState(isEdit && !startInEdit ? 'view' : 'edit')
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
@@ -34,7 +34,7 @@ export default function StudentFormModal({ student, onClose, onSaved }) {
         {mode === 'view' && student ? (
           <StudentProfile student={student} onClose={onClose} onEdit={() => setMode('edit')} onChanged={onSaved} />
         ) : (
-          <StudentEditForm student={student} onClose={onClose} onSaved={onSaved} onCancelEdit={isEdit ? () => setMode('view') : null} />
+          <StudentEditForm student={student} onClose={onClose} onSaved={onSaved} onCancelEdit={isEdit ? () => setMode('view') : null} isNewFicha={isEdit && startInEdit} />
         )}
       </div>
     </div>
@@ -306,7 +306,7 @@ function Section({ title, children }) {
 
 // ---------- Editar ficha ----------
 
-function StudentEditForm({ student, onClose, onSaved, onCancelEdit }) {
+function StudentEditForm({ student, onClose, onSaved, onCancelEdit, isNewFicha }) {
   const { user } = useAuth()
   const isEdit = !!student
   const [name, setName] = useState(student?.name || '')
@@ -422,9 +422,12 @@ function StudentEditForm({ student, onClose, onSaved, onCancelEdit }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <div className="font-bold text-lg">{isEdit ? 'Editar alumno' : 'Nuevo alumno'}</div>
+        <div className="font-bold text-lg">{isNewFicha ? 'Completar ficha' : isEdit ? 'Editar alumno' : 'Nuevo alumno'}</div>
         <button onClick={onClose} className="text-slate-400"><CloseIcon /></button>
       </div>
+      {isNewFicha && (
+        <p className="text-xs text-slate-500 -mt-2 mb-3">Ya lo sumaste a la clase. Completá sus datos ahora o cerrá esto y hacelo después desde Panel Alumnos.</p>
+      )}
 
       <div className="space-y-3">
         <input className="input" placeholder={isEdit ? 'Nombre' : 'Nombre *'} value={name} onChange={(e) => setName(e.target.value)} />

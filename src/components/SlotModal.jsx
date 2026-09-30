@@ -16,6 +16,7 @@ import {
   MESSAGE_DEFAULTS,
 } from '../lib/helpers'
 import { CloseIcon, WhatsAppIcon, PlusIcon, WarningIcon, LockIcon, ChevronDown } from './Icons'
+import StudentFormModal from './StudentFormModal'
 
 export default function SlotModal({ slot, profile, onClose, onSaved }) {
   const { user } = useAuth()
@@ -36,6 +37,7 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
   const [newIsFixed, setNewIsFixed] = useState(true)
   const [waMenuForId, setWaMenuForId] = useState(null)
   const [removeChoiceForId, setRemoveChoiceForId] = useState(null)
+  const [newStudentFicha, setNewStudentFicha] = useState(null)
 
   const dayIdx = slot.dayIdx ?? jsDayToIdx(new Date(slot.iso + 'T12:00:00').getDay())
   const slotDateLabel = (() => {
@@ -159,6 +161,7 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
       if (student) {
         setStudents((s) => [...s, student])
         await insertClass(student)
+        setNewStudentFicha(student)
       }
     }
     setQuery('')
@@ -347,6 +350,7 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
   }
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="card w-full sm:max-w-md max-h-[85vh] overflow-y-auto rounded-b-none sm:rounded-2xl p-5 fade-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
@@ -615,6 +619,22 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
         )}
       </div>
     </div>
+
+    {newStudentFicha && (
+      <StudentFormModal
+        student={newStudentFicha}
+        startInEdit
+        onClose={() => {
+          setNewStudentFicha(null)
+          loadAll()
+        }}
+        onSaved={() => {
+          setNewStudentFicha(null)
+          loadAll()
+        }}
+      />
+    )}
+    </>
   )
 }
 
