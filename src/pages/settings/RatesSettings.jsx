@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { CURRENCIES } from '../../lib/helpers'
+import { CURRENCIES, toISODate, isClassFinished, sizeKeyFor, priceForSize, commissionForSize } from '../../lib/helpers'
 import Header from '../../components/Header'
+import { CashIcon, UsersIcon, CheckCircleIcon } from '../../components/Icons'
 
 const ROWS = [
   { key: 'individual', label: 'Individual', count: 1 },
@@ -17,8 +18,10 @@ export default function RatesSettings() {
   const { user, profile, refreshProfile } = useAuth()
   const [currency, setCurrency] = useState(null)
   const [pricesByCurrency, setPricesByCurrency] = useState({})
+  const [savedRates, setSavedRates] = useState({})
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
+  const [updatedCount, setUpdatedCount] = useState(null)
   const [alias, setAlias] = useState(profile?.payment_alias || '')
   const [cbu, setCbu] = useState(profile?.payment_cbu_cvu || '')
   const [savingCobro, setSavingCobro] = useState(false)
@@ -41,10 +44,12 @@ export default function RatesSettings() {
         setCurrency(data.currency)
         const currentPrices = {}
         ALL_FIELDS.forEach((f) => (currentPrices[f] = data[f] ?? 0))
-        setPricesByCurrency({
+        const merged = {
           ...(data.prices_by_currency || {}),
           [data.currency]: currentPrices,
-        })
+        }
+        setPricesByCurrency(merged)
+        setSavedRates(merged)
       })
   }, [user])
 
@@ -54,15 +59,61 @@ export default function RatesSettings() {
       [currency]: { ...(p[currency] || EMPTY_PRICES), [field]: value },
     }))
     setDirty(true)
+    setUpdatedCount(null)
   }
 
   function switchCurrency(c) {
     setCurrency(c)
     setDirty(true)
+    setUpdatedCount(null)
+  }
+
+  // Las clases ya cargadas en el calendario guardan su precio y comisión como una foto
+  // del momento en que se crearon — no se recalculan solas. Al guardar una tarifa nueva,
+  // les pasamos el cambio a las clases que todavía no se dieron (para no tocar plata que
+  // ya es historia), y solo si su precio seguía siendo el de la tarifa anterior — si el
+  // profe editó el precio de una clase puntual a mano, esa no se toca.
+  async function propagateToUpcoming(oldRates, newRates) {
+    const todayISO = toISODate(new Date())
+    const { data: classes } = await supabase
+      .from('classes')
+      .select('id, class_date, start_time, end_time, status, price, commission, student_id')
+      .eq('profesor_id', user.id)
+      .gte('class_date', todayISO)
+      .not('student_id', 'is', null)
+      .not('status', 'eq', 'cancelled')
+    const upcoming = (classes || []).filter((c) => !isClassFinished(c))
+    if (upcoming.length === 0) return 0
+
+    const countByKey = {}
+    upcoming.forEach((c) => {
+      const key = `${c.class_date}_${c.start_time}`
+      countByKey[key] = (countByKey[key] || 0) + 1
+    })
+
+    const updates = []
+    upcoming.forEach((c) => {
+      const count = countByKey[`${c.class_date}_${c.start_time}`]
+      const size = sizeKeyFor(count)
+      const oldPrice = priceForSize(oldRates, size) || 0
+      const oldCommission = (commissionForSize(oldRates, size) || 0) / count
+      const untouched = Math.abs(Number(c.price || 0) - oldPrice) < 0.01 && Math.abs(Number(c.commission || 0) - oldCommission) < 0.01
+      if (!untouched) return
+      const newPrice = priceForSize(newRates, size) || 0
+      const newCommission = (commissionForSize(newRates, size) || 0) / count
+      if (Math.abs(newPrice - oldPrice) < 0.01 && Math.abs(newCommission - oldCommission) < 0.01) return
+      updates.push({ id: c.id, price: newPrice, commission: newCommission })
+    })
+
+    if (updates.length === 0) return 0
+    await supabase.from('classes').upsert(updates)
+    return updates.length
   }
 
   async function save() {
     setSaving(true)
+    setUpdatedCount(null)
+    const oldRates = savedRates[currency] || EMPTY_PRICES
     const active = pricesByCurrency[currency] || EMPTY_PRICES
     const normalized = {}
     ALL_FIELDS.forEach((f) => (normalized[f] = Number(active[f]) || 0))
@@ -80,6 +131,10 @@ export default function RatesSettings() {
     await supabase.from('profiles').update({ currency }).eq('id', user.id)
     await refreshProfile()
     setPricesByCurrency(updatedByCurrency)
+    setSavedRates(updatedByCurrency)
+
+    const count = await propagateToUpcoming(oldRates, normalized)
+    setUpdatedCount(count)
     setSaving(false)
     setDirty(false)
   }
@@ -100,14 +155,18 @@ export default function RatesSettings() {
       <h1 className="text-xl font-extrabold mb-0.5">Mis tarifas</h1>
       <p className="text-slate-400 text-sm mb-5">Lo que le cobrás a cada alumno y lo que le dejás al club por cada clase — se usa para armar tu Caja.</p>
 
-      <div className="card p-4">
-        <div className="label-muted mb-2">Moneda</div>
+      <div className="card p-4 bg-gradient-to-br from-brand/10 via-brand-2/5 to-transparent border-brand/20">
+        <div className="w-8 h-1 rounded-full bar-gradient mb-3" />
+        <div className="flex items-center gap-2 mb-3">
+          <span className="w-8 h-8 rounded-lg bg-brand/15 text-brand flex items-center justify-center shrink-0"><CashIcon size={16} /></span>
+          <div className="label-muted">Moneda</div>
+        </div>
         <div className="flex gap-2 mb-2 flex-wrap">
           {CURRENCIES.map((c) => (
             <button
               key={c}
               onClick={() => switchCurrency(c)}
-              className={`pill ${currency === c ? 'bg-brand text-slate-900 font-bold' : 'card text-slate-300'}`}
+              className={`pill transition ${currency === c ? 'bar-gradient text-white font-bold' : 'card text-slate-300'}`}
             >
               {c}
             </button>
@@ -119,39 +178,52 @@ export default function RatesSettings() {
 
         <div className="label-muted mb-1">Precio por alumno y comisión al club</div>
         <p className="text-xs text-slate-500 mb-3">Cargá lo que le cobrás al alumno y, si le rendís algo al club por cada clase, cuánto es — te queda calculado lo que ganás vos.</p>
-        {ROWS.map((r, i) => (
-          <PriceCommissionRow
-            key={r.key}
-            label={r.label}
-            count={r.count}
-            price={active[`${r.key}_price`]}
-            commission={active[`${r.key}_commission`]}
-            onPriceChange={(v) => update(`${r.key}_price`, v)}
-            onCommissionChange={(v) => update(`${r.key}_commission`, v)}
-            currency={currency}
-            last={i === ROWS.length - 1}
-          />
-        ))}
+        <div className="card divide-y divide-bg-border">
+          {ROWS.map((r, i) => (
+            <PriceCommissionRow
+              key={r.key}
+              label={r.label}
+              count={r.count}
+              price={active[`${r.key}_price`]}
+              commission={active[`${r.key}_commission`]}
+              onPriceChange={(v) => update(`${r.key}_price`, v)}
+              onCommissionChange={(v) => update(`${r.key}_commission`, v)}
+              currency={currency}
+            />
+          ))}
+        </div>
 
-        <div className="label-muted mb-1 mt-4">Tarifa mensual (para alumnos que pagan por mes)</div>
-        <PriceCommissionRow
-          label="Por mes, venga las veces que venga"
-          count={1}
-          price={active.monthly_price}
-          commission={active.monthly_commission}
-          onPriceChange={(v) => update('monthly_price', v)}
-          onCommissionChange={(v) => update('monthly_commission', v)}
-          currency={currency}
-          last
-        />
+        <div className="label-muted mb-1 mt-5">Tarifa mensual (para alumnos que pagan por mes)</div>
+        <div className="card">
+          <PriceCommissionRow
+            label="Por mes, venga las veces que venga"
+            count={1}
+            price={active.monthly_price}
+            commission={active.monthly_commission}
+            onPriceChange={(v) => update('monthly_price', v)}
+            onCommissionChange={(v) => update('monthly_commission', v)}
+            currency={currency}
+          />
+        </div>
 
         <button onClick={save} disabled={saving || !dirty} className="btn-primary mt-5">
-          Guardar tarifas en {currency}
+          {saving ? 'Guardando...' : `Guardar tarifas en ${currency}`}
         </button>
+        {updatedCount !== null && (
+          <div className="flex items-center gap-1.5 text-xs text-brand font-semibold mt-2.5">
+            <CheckCircleIcon size={13} />
+            {updatedCount === 0
+              ? 'Guardado. No había clases futuras con el precio anterior para actualizar.'
+              : `Guardado. Se actualizaron ${updatedCount} clase${updatedCount === 1 ? '' : 's'} que todavía no se dieron.`}
+          </div>
+        )}
       </div>
 
       <div className="card p-4 mt-4">
-        <div className="label-muted mb-1">Datos para cobros</div>
+        <div className="flex items-center gap-2 mb-1">
+          <span className="w-8 h-8 rounded-lg bg-brand/15 text-brand flex items-center justify-center shrink-0"><UsersIcon size={16} /></span>
+          <div className="label-muted">Datos para cobros</div>
+        </div>
         <p className="text-xs text-slate-500 mb-3">
           Se usan en los mensajes de "Aviso de deuda" (Mis mensajes) para que el alumno tenga a mano dónde transferirte. Si los dejás vacíos, esos mensajes van con [Tu alias] / [Tu CBU/CVU] para que los completes vos antes de enviar.
         </p>
@@ -173,11 +245,11 @@ export default function RatesSettings() {
   )
 }
 
-function PriceCommissionRow({ label, count = 1, price, commission, onPriceChange, onCommissionChange, currency, last }) {
+function PriceCommissionRow({ label, count = 1, price, commission, onPriceChange, onCommissionChange, currency }) {
   const total = (Number(price) || 0) * count
   const neto = total - (Number(commission) || 0)
   return (
-    <div className={`py-3 ${!last ? 'border-b border-bg-border' : ''}`}>
+    <div className="p-4">
       <div className="text-sm font-medium mb-2">{label}</div>
       <div className="grid grid-cols-2 gap-2">
         <MiniInput label="Tarifa al alumno" value={price} onChange={onPriceChange} />
