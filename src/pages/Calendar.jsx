@@ -94,7 +94,6 @@ export default function Calendar() {
   const [classesMap, setClassesMap] = useState({}) // iso -> [{...class, students:{name}}]
   const [blocksMap, setBlocksMap] = useState({}) // iso -> [{...schedule_blocks row}]
   const [fixedSlots, setFixedSlots] = useState([]) // todos los horarios fijos del profe (student_fixed_slots)
-  const [rates, setRates] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeSlot, setActiveSlot] = useState(null) // { iso, dayIdx, time, existingClass }
   const [showHint, setShowHint] = useState(true)
@@ -105,16 +104,14 @@ export default function Calendar() {
 
   const loadSchedule = useCallback(async () => {
     if (!user) return
-    const [{ data: wd }, { data: sl }, { data: fx }, { data: rt }] = await Promise.all([
+    const [{ data: wd }, { data: sl }, { data: fx }] = await Promise.all([
       supabase.from('working_days').select('*').eq('profesor_id', user.id),
       supabase.from('schedule_slots').select('*').eq('profesor_id', user.id),
       supabase.from('student_fixed_slots').select('*').eq('profesor_id', user.id),
-      supabase.from('rates').select('*').eq('profesor_id', user.id).maybeSingle(),
     ])
     setWorkingDays(wd || [])
     setSlots(sl || [])
     setFixedSlots(fx || [])
-    setRates(rt || null)
   }, [user])
 
   // Los "horarios fijos" (student_fixed_slots) son la REGLA (ej: Jona todos los lunes a las
@@ -124,7 +121,14 @@ export default function Calendar() {
   // nunca en el pasado, y respetando bloqueos y horarios ya deshabilitados).
   const materializeFixedSlots = useCallback(
     async (fromDate, toDate, map, bmap) => {
-      if (!fixedSlots.length || !rates) return
+      if (!fixedSlots.length) return
+      // Traemos la tarifa fresca de la base en vez de confiar en el estado ya cargado: si el
+      // profe actualizó sus tarifas en Configuración y volvió al calendario sin recargar la
+      // página, el estado local podría haber quedado desactualizado y generaría clases nuevas
+      // con el precio viejo.
+      const { data: freshRates } = await supabase.from('rates').select('*').eq('profesor_id', user.id).maybeSingle()
+      const rates = freshRates
+      if (!rates) return
       const todayIso = toISODate(new Date())
       const defaultDuration = profile?.class_duration_minutes || 60
       const toInsert = []
@@ -191,7 +195,7 @@ export default function Calendar() {
         map[c.class_date].push(c)
       })
     },
-    [user, fixedSlots, rates, workingDays, slots, profile],
+    [user, fixedSlots, workingDays, slots, profile],
   )
 
   const loadClasses = useCallback(

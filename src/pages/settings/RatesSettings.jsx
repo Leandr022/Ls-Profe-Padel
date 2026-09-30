@@ -68,21 +68,22 @@ export default function RatesSettings() {
     setUpdatedCount(null)
   }
 
-  // Las clases ya cargadas en el calendario guardan su precio y comisión como una foto
-  // del momento en que se crearon — no se recalculan solas. Al guardar una tarifa nueva,
-  // les pasamos el cambio a las clases que todavía no se dieron (para no tocar plata que
-  // ya es historia), y solo si su precio seguía siendo el de la tarifa anterior — si el
-  // profe editó el precio de una clase puntual a mano, esa no se toca.
-  async function propagateToUpcoming(oldRates, newRates) {
+  // Las clases ya cargadas en el calendario guardan su precio y comisión como una foto del
+  // momento en que se crearon — no se recalculan solas. Cada vez que se guardan las tarifas
+  // (aunque no hayan cambiado los números, por si algo quedó desactualizado) sincronizamos
+  // las clases que todavía no se dieron con el valor actual de la tarifa según el tamaño del
+  // grupo — salvo las que el profe haya editado a mano desde el lápiz en una clase puntual,
+  // esas quedan protegidas y no se tocan.
+  async function propagateToUpcoming(newRates) {
     const todayISO = toISODate(new Date())
     const { data: classes } = await supabase
       .from('classes')
-      .select('id, class_date, start_time, end_time, status, price, commission, student_id')
+      .select('id, class_date, start_time, end_time, status, price, commission, student_id, price_manual')
       .eq('profesor_id', user.id)
       .gte('class_date', todayISO)
       .not('student_id', 'is', null)
       .not('status', 'eq', 'cancelled')
-    const upcoming = (classes || []).filter((c) => !isClassFinished(c))
+    const upcoming = (classes || []).filter((c) => !isClassFinished(c) && !c.price_manual)
     if (upcoming.length === 0) return 0
 
     const countByKey = {}
@@ -95,13 +96,9 @@ export default function RatesSettings() {
     upcoming.forEach((c) => {
       const count = countByKey[`${c.class_date}_${c.start_time}`]
       const size = sizeKeyFor(count)
-      const oldPrice = priceForSize(oldRates, size) || 0
-      const oldCommission = (commissionForSize(oldRates, size) || 0) / count
-      const untouched = Math.abs(Number(c.price || 0) - oldPrice) < 0.01 && Math.abs(Number(c.commission || 0) - oldCommission) < 0.01
-      if (!untouched) return
       const newPrice = priceForSize(newRates, size) || 0
       const newCommission = (commissionForSize(newRates, size) || 0) / count
-      if (Math.abs(newPrice - oldPrice) < 0.01 && Math.abs(newCommission - oldCommission) < 0.01) return
+      if (Math.abs(Number(c.price || 0) - newPrice) < 0.01 && Math.abs(Number(c.commission || 0) - newCommission) < 0.01) return
       updates.push({ id: c.id, price: newPrice, commission: newCommission })
     })
 
@@ -113,7 +110,6 @@ export default function RatesSettings() {
   async function save() {
     setSaving(true)
     setUpdatedCount(null)
-    const oldRates = savedRates[currency] || EMPTY_PRICES
     const active = pricesByCurrency[currency] || EMPTY_PRICES
     const normalized = {}
     ALL_FIELDS.forEach((f) => (normalized[f] = Number(active[f]) || 0))
@@ -133,7 +129,7 @@ export default function RatesSettings() {
     setPricesByCurrency(updatedByCurrency)
     setSavedRates(updatedByCurrency)
 
-    const count = await propagateToUpcoming(oldRates, normalized)
+    const count = await propagateToUpcoming(normalized)
     setUpdatedCount(count)
     setSaving(false)
     setDirty(false)
@@ -206,15 +202,20 @@ export default function RatesSettings() {
           />
         </div>
 
-        <button onClick={save} disabled={saving || !dirty} className="btn-primary mt-5">
-          {saving ? 'Guardando...' : `Guardar tarifas en ${currency}`}
+        <button onClick={save} disabled={saving} className="btn-primary mt-5">
+          {saving ? 'Guardando...' : dirty ? `Guardar tarifas en ${currency}` : `Volver a sincronizar clases en ${currency}`}
         </button>
+        {!dirty && updatedCount === null && (
+          <p className="text-xs text-slate-500 mt-2">
+            ¿Cargaste una clase y no te tomó el precio nuevo? Tocá el botón para volver a sincronizar las clases que todavía no se dieron con esta tarifa.
+          </p>
+        )}
         {updatedCount !== null && (
           <div className="flex items-center gap-1.5 text-xs text-brand font-semibold mt-2.5">
             <CheckCircleIcon size={13} />
             {updatedCount === 0
-              ? 'Guardado. No había clases futuras con el precio anterior para actualizar.'
-              : `Guardado. Se actualizaron ${updatedCount} clase${updatedCount === 1 ? '' : 's'} que todavía no se dieron.`}
+              ? 'Listo. Todas las clases futuras ya tenían el precio correcto.'
+              : `Listo. Se actualizaron ${updatedCount} clase${updatedCount === 1 ? '' : 's'} que todavía no se dieron.`}
           </div>
         )}
       </div>

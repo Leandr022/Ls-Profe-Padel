@@ -104,11 +104,13 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
     await Promise.all(
       nextRows.map((r) =>
         r.status === 'cancelled'
-          ? supabase.from('classes').update({ price: 0, commission: 0 }).eq('id', r.id)
-          : supabase.from('classes').update({ price, commission }).eq('id', r.id),
+          ? supabase.from('classes').update({ price: 0, commission: 0, price_manual: false }).eq('id', r.id)
+          : supabase.from('classes').update({ price, commission, price_manual: false }).eq('id', r.id),
       ),
     )
-    return nextRows.map((r) => (r.status === 'cancelled' ? { ...r, price: 0, commission: 0 } : { ...r, price, commission }))
+    return nextRows.map((r) =>
+      r.status === 'cancelled' ? { ...r, price: 0, commission: 0, price_manual: false } : { ...r, price, commission, price_manual: false },
+    )
   }
 
   async function insertClass(student) {
@@ -252,11 +254,14 @@ export default function SlotModal({ slot, profile, onClose, onSaved }) {
     setSaving(false)
   }
 
+  // Si el profe toca el lápiz y pone un precio a mano para ESTA clase puntual, la marcamos como
+  // "manual" para que quede protegida: cuando después actualice las tarifas generales, esta clase
+  // no se pisa sola con el valor nuevo.
   async function savePrice(row) {
     const val = Number(priceDraft)
     if (!isNaN(val)) {
-      await supabase.from('classes').update({ price: val }).eq('id', row.id)
-      setRows((rs) => rs.map((r) => (r.id === row.id ? { ...r, price: val } : r)))
+      await supabase.from('classes').update({ price: val, price_manual: true }).eq('id', row.id)
+      setRows((rs) => rs.map((r) => (r.id === row.id ? { ...r, price: val, price_manual: true } : r)))
     }
     setEditingPriceId(null)
   }
