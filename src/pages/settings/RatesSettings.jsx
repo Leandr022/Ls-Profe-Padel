@@ -103,7 +103,7 @@ export default function RatesSettings() {
     })
 
     if (updates.length === 0) return 0
-    await supabase.from('classes').upsert(updates)
+    await Promise.all(updates.map((u) => supabase.from('classes').update({ price: u.price, commission: u.commission }).eq('id', u.id)))
     return updates.length
   }
 
