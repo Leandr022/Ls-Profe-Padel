@@ -1,12 +1,13 @@
 import { Link } from 'react-router-dom'
 import Header from '../components/Header'
-import { CalendarIcon, UsersIcon, CashIcon, ChartIcon, ChevronRight } from '../components/Icons'
+import { CalendarIcon, UsersIcon, CashIcon, ChartIcon, SettingsIcon, ChevronRight } from '../components/Icons'
 
 const items = [
-  { to: '/panel/calendario', title: 'Mi calendario', desc: 'Tu semana: clases, huecos y faltas', Icon: CalendarIcon },
-  { to: '/panel/alumnos', title: 'Alumnos', desc: 'Fichas, categorías y notas', Icon: UsersIcon },
-  { to: '/panel/caja', title: 'Caja', desc: 'Facturado y cobrado del mes', Icon: CashIcon },
-  { to: '/panel/estadisticas', title: 'Estadísticas', desc: 'Resumen del mes y comparación', Icon: ChartIcon },
+  { to: '/panel/calendario', title: 'Mi calendario', desc: 'Tu semana: clases, huecos y faltas', Icon: CalendarIcon, color: 'brand' },
+  { to: '/panel/alumnos', title: 'Alumnos', desc: 'Fichas, categorías y notas', Icon: UsersIcon, color: 'brand-2' },
+  { to: '/panel/caja', title: 'Caja', desc: 'Facturado y cobrado del mes', Icon: CashIcon, color: 'brand' },
+  { to: '/panel/estadisticas', title: 'Estadísticas', desc: 'Resumen del mes y comparación', Icon: ChartIcon, color: 'brand-2' },
+  { to: '/configuracion', title: 'Configuración', desc: 'Horarios, tarifas, mensajes y más', Icon: SettingsIcon, color: 'brand' },
 ]
 
 export default function Panel() {
@@ -17,14 +18,16 @@ export default function Panel() {
       <p className="text-slate-400 text-sm mb-6">Tu espacio de trabajo</p>
 
       <div className="space-y-3 sm:grid sm:grid-cols-2 sm:gap-3 sm:space-y-0">
-        {items.map(({ to, title, desc, Icon }) => (
+        {items.map(({ to, title, desc, Icon, color }) => (
           <Link key={to} to={to} className="card flex items-center gap-3 p-4 hover:border-brand/40 transition">
-            <Icon className="text-slate-400" size={22} />
-            <div className="flex-1">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${color === 'brand' ? 'bg-brand/15 text-brand' : 'bg-brand-2/15 text-brand-2'}`}>
+              <Icon size={19} />
+            </div>
+            <div className="flex-1 min-w-0">
               <div className="font-bold">{title}</div>
               <div className="text-xs text-slate-400">{desc}</div>
             </div>
-            <ChevronRight className="text-slate-500" />
+            <ChevronRight className="text-slate-500 shrink-0" />
           </Link>
         ))}
       </div>

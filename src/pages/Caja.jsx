@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatMoney, monthLabel, toISODate, waLink, fillTemplate, sizeKeyFor, groupSizeLabel, isClassFinished, MESSAGE_DEFAULTS } from '../lib/helpers'
 import Header from '../components/Header'
-import { ChevronLeft, ChevronRight, ChevronRight as Chev, WhatsAppIcon, PlusIcon, CloseIcon, CheckCircleIcon } from '../components/Icons'
+import { ChevronLeft, ChevronRight, ChevronRight as Chev, WhatsAppIcon, PlusIcon, CloseIcon, CheckCircleIcon, CashIcon, WarningIcon } from '../components/Icons'
 
 export default function Caja() {
   const { user, profile } = useAuth()
@@ -141,9 +141,13 @@ export default function Caja() {
         <button onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))} className="btn-secondary p-2 rounded-full"><ChevronRight /></button>
       </div>
 
-      <div className="card p-5 mb-3">
-        <div className="label-muted mb-1">Total facturado</div>
-        <div className="text-3xl font-extrabold">{loading ? '–' : formatMoney(totalFacturado, profile?.currency)}</div>
+      <div className="card p-5 mb-3 bg-gradient-to-br from-brand/10 via-brand-2/5 to-transparent border-brand/20">
+        <div className="w-8 h-1 rounded-full bar-gradient mb-3" />
+        <div className="flex items-center gap-2 mb-1">
+          <span className="w-8 h-8 rounded-lg bg-brand/15 text-brand flex items-center justify-center shrink-0"><CashIcon size={16} /></span>
+          <div className="label-muted">Total facturado</div>
+        </div>
+        <div className="text-3xl font-extrabold text-gradient">{loading ? '–' : formatMoney(totalFacturado, profile?.currency)}</div>
         <div className="text-xs text-slate-500 mt-1">
           {isCurrentMonth ? 'Clases dadas este mes, hasta hoy' : `Clases de ${monthLabel(cursor)}`}
         </div>
@@ -162,18 +166,20 @@ export default function Caja() {
 
       <div className="grid grid-cols-2 gap-2.5 mb-2.5">
         <button onClick={() => setOpenSection(openSection === 'debe' ? null : 'debe')} className="text-left rounded-2xl bg-red-950/40 border border-red-800/40 p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-red-400">Quién debe</span>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="w-7 h-7 rounded-lg bg-red-500/15 text-red-400 flex items-center justify-center"><WarningIcon size={14} /></span>
             <Chev className={`text-red-400 transition ${openSection === 'debe' ? 'rotate-90' : ''}`} size={14} />
           </div>
+          <div className="text-xs font-bold text-red-400">Quién debe</div>
           <div className="text-xl font-extrabold mt-1">{loading ? '–' : formatMoney(totalDebe, profile?.currency)}</div>
           <div className="text-[11px] text-red-300/70 mt-0.5">{debtByStudent.length} alumnos</div>
         </button>
         <button onClick={() => setOpenSection(openSection === 'pagaron' ? null : 'pagaron')} className="text-left rounded-2xl bg-brand/10 border border-brand/30 p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-brand">Ya pagaron</span>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="w-7 h-7 rounded-lg bg-brand/15 text-brand flex items-center justify-center"><CheckCircleIcon size={14} /></span>
             <Chev className={`text-brand transition ${openSection === 'pagaron' ? 'rotate-90' : ''}`} size={14} />
           </div>
+          <div className="text-xs font-bold text-brand">Ya pagaron</div>
           <div className="text-xl font-extrabold mt-1">{loading ? '–' : formatMoney(totalPagaron, profile?.currency)}</div>
           <div className="text-[11px] text-blue-300/70 mt-0.5">{paidByStudent.length} alumnos</div>
         </button>
@@ -251,12 +257,13 @@ export default function Caja() {
         </div>
       )}
 
-      <button onClick={() => setOpenSection(openSection === 'gastos' ? null : 'gastos')} className="w-full text-left rounded-2xl bg-amber-950/40 border border-amber-800/40 p-4 flex items-center justify-between mb-2.5">
-        <div>
+      <button onClick={() => setOpenSection(openSection === 'gastos' ? null : 'gastos')} className="w-full text-left rounded-2xl bg-amber-950/40 border border-amber-800/40 p-4 flex items-center gap-3 mb-2.5">
+        <span className="w-9 h-9 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0"><CashIcon size={16} /></span>
+        <div className="flex-1">
           <div className="text-xs font-bold text-amber-400">Gastos</div>
           <div className="text-[11px] text-amber-300/70">{expenses.length} gastos</div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <span className="text-lg font-extrabold">{loading ? '–' : formatMoney(totalGastos, profile?.currency)}</span>
           <Chev className={`text-amber-400 transition ${openSection === 'gastos' ? 'rotate-90' : ''}`} size={14} />
         </div>

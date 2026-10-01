@@ -234,7 +234,7 @@ export default function Stats() {
         )}
 
         <button onClick={() => setShowTop((v) => !v)} className="w-full flex items-center gap-3 px-4 py-3.5 text-left">
-          <span className="w-8 h-8 rounded-lg bg-violet-500/15 text-violet-400 flex items-center justify-center"><TrophyIcon size={16} /></span>
+          <span className="w-8 h-8 rounded-lg bg-brand-2/15 text-brand-2 flex items-center justify-center"><TrophyIcon size={16} /></span>
           <span className="flex-1">
             <span className="font-semibold block">Top asistencia</span>
             <span className="text-xs text-slate-500">{monthLabel(now)}</span>
@@ -319,7 +319,7 @@ function RankingList({ ranking }) {
               <div key={s.name + i} className="text-sm">
                 <div className="flex items-center justify-between mb-1">
                   <span className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-violet-500/15 text-violet-400 text-[10px] font-bold flex items-center justify-center">{i + 4}</span>
+                    <span className="w-5 h-5 rounded-full bg-brand-2/15 text-brand-2 text-[10px] font-bold flex items-center justify-center">{i + 4}</span>
                     {s.name}
                   </span>
                   <span className="text-slate-400">{s.count} clase{s.count !== 1 ? 's' : ''}</span>

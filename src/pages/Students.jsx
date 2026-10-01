@@ -63,12 +63,12 @@ export default function Students() {
       </div>
 
       <div className="flex gap-2 mb-3 flex-wrap">
-        <button onClick={() => setTab('todos')} className={`pill ${tab === 'todos' ? 'bg-brand text-slate-900 font-bold' : 'card text-slate-300'}`}>Todos</button>
-        <button onClick={() => setTab('enfriando')} className={`pill ${tab === 'enfriando' ? 'bg-brand text-slate-900 font-bold' : 'card text-slate-300'}`}>
+        <button onClick={() => setTab('todos')} className={`pill transition ${tab === 'todos' ? 'bar-gradient text-white font-bold' : 'card text-slate-300'}`}>Todos</button>
+        <button onClick={() => setTab('enfriando')} className={`pill transition ${tab === 'enfriando' ? 'bar-gradient text-white font-bold' : 'card text-slate-300'}`}>
           Enfriándose {coolingCount}
         </button>
         {bajaCount > 0 && (
-          <button onClick={() => setTab('baja')} className={`pill ${tab === 'baja' ? 'bg-brand text-slate-900 font-bold' : 'card text-slate-300'}`}>
+          <button onClick={() => setTab('baja')} className={`pill transition ${tab === 'baja' ? 'bar-gradient text-white font-bold' : 'card text-slate-300'}`}>
             Bajas {bajaCount}
           </button>
         )}
@@ -134,7 +134,7 @@ export default function Students() {
 
       <button
         onClick={() => setModalStudent(null)}
-        className="fixed bottom-24 right-6 w-14 h-14 rounded-full bg-brand text-slate-900 flex items-center justify-center shadow-xl active:scale-95 transition z-30"
+        className="fixed bottom-24 right-6 w-14 h-14 rounded-full bar-gradient text-white flex items-center justify-center shadow-xl shadow-brand/30 active:scale-95 transition z-30"
       >
         <PlusIcon size={26} />
       </button>

@@ -334,7 +334,7 @@ export default function Calendar() {
             key={v}
             onClick={() => setView(v)}
             className={`py-2 rounded-xl text-sm font-semibold capitalize transition ${
-              view === v ? 'bg-brand text-slate-900' : 'text-slate-400'
+              view === v ? 'bar-gradient text-white' : 'text-slate-400'
             }`}
           >
             {v === 'dia' ? 'Día' : v}
