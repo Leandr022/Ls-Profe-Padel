@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import { getAccessStatus } from './lib/access'
 import RenewalBanner from './components/RenewalBanner'
+import BottomNav from './components/BottomNav'
 
 import Login from './pages/Login'
 import Home from './pages/Home'
@@ -73,6 +74,17 @@ function AdminRoute({ children }) {
   return children
 }
 
+// Las pantallas de uso diario llevan la barra de navegación fija abajo; Configuración y
+// sus subpáginas no, para no competir con el botón de "Volver" de esas pantallas.
+function MainTab({ children }) {
+  return (
+    <>
+      {children}
+      <BottomNav />
+    </>
+  )
+}
+
 export default function App() {
   useThemeSync()
   const { session, loading } = useAuth()
@@ -82,12 +94,12 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={session ? <Navigate to="/" replace /> : <Login />} />
-      <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-      <Route path="/panel" element={<ProtectedRoute><Panel /></ProtectedRoute>} />
-      <Route path="/panel/calendario" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
-      <Route path="/panel/alumnos" element={<ProtectedRoute><Students /></ProtectedRoute>} />
-      <Route path="/panel/caja" element={<ProtectedRoute><Caja /></ProtectedRoute>} />
-      <Route path="/panel/estadisticas" element={<ProtectedRoute><Stats /></ProtectedRoute>} />
+      <Route path="/" element={<ProtectedRoute><MainTab><Home /></MainTab></ProtectedRoute>} />
+      <Route path="/panel" element={<ProtectedRoute><MainTab><Panel /></MainTab></ProtectedRoute>} />
+      <Route path="/panel/calendario" element={<ProtectedRoute><MainTab><Calendar /></MainTab></ProtectedRoute>} />
+      <Route path="/panel/alumnos" element={<ProtectedRoute><MainTab><Students /></MainTab></ProtectedRoute>} />
+      <Route path="/panel/caja" element={<ProtectedRoute><MainTab><Caja /></MainTab></ProtectedRoute>} />
+      <Route path="/panel/estadisticas" element={<ProtectedRoute><MainTab><Stats /></MainTab></ProtectedRoute>} />
       <Route path="/configuracion" element={<ProtectedRoute><SettingsHome /></ProtectedRoute>} />
       <Route path="/configuracion/horarios" element={<ProtectedRoute><ScheduleSettings /></ProtectedRoute>} />
       <Route path="/configuracion/tarifas" element={<ProtectedRoute><RatesSettings /></ProtectedRoute>} />

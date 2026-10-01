@@ -134,7 +134,7 @@ export default function Students() {
 
       <button
         onClick={() => setModalStudent(null)}
-        className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-brand text-slate-900 flex items-center justify-center shadow-xl active:scale-95 transition"
+        className="fixed bottom-24 right-6 w-14 h-14 rounded-full bg-brand text-slate-900 flex items-center justify-center shadow-xl active:scale-95 transition z-30"
       >
         <PlusIcon size={26} />
       </button>

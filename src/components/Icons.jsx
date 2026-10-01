@@ -1,6 +1,13 @@
 // Íconos lineales simples (SVG inline, sin dependencias externas)
 const base = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round' }
 
+export const HomeIcon = (p) => (
+  <svg viewBox="0 0 24 24" width={p.size || 20} height={p.size || 20} {...base} className={p.className}>
+    <path d="M4 11.5 12 4l8 7.5" />
+    <path d="M6 10v9.5a1 1 0 001 1h10a1 1 0 001-1V10" />
+    <path d="M10 20.5v-6h4v6" />
+  </svg>
+)
 export const CalendarIcon = (p) => (
   <svg viewBox="0 0 24 24" width={p.size || 20} height={p.size || 20} {...base} className={p.className}>
     <rect x="3" y="5" width="18" height="16" rx="2" />

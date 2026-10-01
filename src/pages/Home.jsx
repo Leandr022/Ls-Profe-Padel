@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatMoney, toISODate, waLink, fillTemplate, isClassFinished, categoryLabel, MESSAGE_DEFAULTS } from '../lib/helpers'
-import { CalendarIcon, ChevronRight, SettingsIcon, WhatsAppIcon, CloseIcon, CheckCircleIcon } from '../components/Icons'
+import { CalendarIcon, ChevronRight, SettingsIcon, WhatsAppIcon, CloseIcon, CheckCircleIcon, CashIcon, BellIcon, UsersIcon, WarningIcon } from '../components/Icons'
 
 export default function Home() {
   const { user, profile } = useAuth()
@@ -103,7 +103,7 @@ export default function Home() {
   const todayLabel = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
 
   return (
-    <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 fade-in">
+    <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 pb-24 fade-in">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-1.5 font-extrabold text-lg">
           <img src="/logo.png" alt="" className="w-6 h-6 rounded-full object-cover" />
@@ -114,62 +114,81 @@ export default function Home() {
         </Link>
       </div>
 
-      <h1 className="text-2xl font-extrabold">Hola, {firstName}</h1>
-      <p className="text-slate-400 text-sm mb-5 capitalize">{todayLabel}</p>
+      <h1 className="text-2xl font-extrabold">Hola, {firstName} 👋</h1>
+      <p className="text-slate-400 text-sm mb-4 capitalize">{todayLabel}</p>
 
-      <div className="label-muted mb-2">Tu día</div>
-      <div className="grid grid-cols-3 gap-2.5 mb-4">
-        <div className="card p-4 text-center bg-gradient-to-br from-brand/10 via-transparent to-transparent">
-          <div className="text-2xl font-extrabold text-gradient">{loading ? '–' : stats.classesToday}</div>
-          <div className="text-[11px] text-slate-400 mt-1">CLASES HOY</div>
-        </div>
-        <div className="card p-4 text-center bg-gradient-to-br from-brand/10 via-transparent to-transparent">
-          <div className="text-lg font-extrabold text-gradient">{loading ? '–' : formatMoney(stats.gain, profile?.currency)}</div>
-          <div className="text-[11px] text-slate-400 mt-1">GANANCIA ESTE MES</div>
-        </div>
-        <div className="card p-4 text-center bg-gradient-to-br from-brand/10 via-transparent to-transparent">
-          <div className="text-2xl font-extrabold text-gradient">{loading ? '–' : stats.students}</div>
-          <div className="text-[11px] text-slate-400 mt-1">ALUMNOS</div>
+      <div className="card p-4 mb-5 bg-gradient-to-br from-brand/15 via-brand-2/5 to-transparent border-brand/25 shadow-[0_8px_24px_-8px_rgba(59,130,246,0.35)]">
+        <div className="grid grid-cols-3 divide-x divide-white/5">
+          <div className="text-center px-1">
+            <div className="w-8 h-8 rounded-lg bg-brand/20 text-brand flex items-center justify-center mx-auto mb-1.5">
+              <CalendarIcon size={15} />
+            </div>
+            <div className="text-lg font-extrabold">{loading ? '–' : stats.classesToday}</div>
+            <div className="text-[9px] text-slate-400 mt-0.5 uppercase tracking-wide">Clases hoy</div>
+          </div>
+          <div className="text-center px-1">
+            <div className="w-8 h-8 rounded-lg bg-brand-2/20 text-brand-2 flex items-center justify-center mx-auto mb-1.5">
+              <CashIcon size={15} />
+            </div>
+            <div className="text-sm font-extrabold">{loading ? '–' : formatMoney(stats.gain, profile?.currency)}</div>
+            <div className="text-[9px] text-slate-400 mt-0.5 uppercase tracking-wide">Este mes</div>
+          </div>
+          <div className="text-center px-1">
+            <div className="w-8 h-8 rounded-lg bg-brand-light/20 text-brand-light flex items-center justify-center mx-auto mb-1.5">
+              <UsersIcon size={15} />
+            </div>
+            <div className="text-lg font-extrabold">{loading ? '–' : stats.students}</div>
+            <div className="text-[9px] text-slate-400 mt-0.5 uppercase tracking-wide">Alumnos</div>
+          </div>
         </div>
       </div>
 
       {!loading && stats.classesToday === 0 && (
         <p className="text-center text-sm text-slate-400 mb-4">
-          Hoy no tenés clases cargadas. Tocá Panel Profe para armar tu semana.
+          Hoy no tenés clases cargadas. Tocá Calendario para armar tu semana.
         </p>
       )}
 
-      <button onClick={() => setShowWhoNotComing(true)} className="btn-secondary w-full flex items-center justify-center gap-1 mb-4 py-3">
-        ¿Quién no viene? →
-      </button>
-
       {!loading && (
-        <div className="space-y-2 mb-6">
-          {debtInfo.debtors === 0 ? (
-            <div className="rounded-xl bg-brand/10 border border-brand/30 text-brand text-sm font-semibold text-center py-3 px-4">
-              Estás al día con los cobros.
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowDebtModal(true)}
-              className="w-full rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm font-semibold text-center py-3 px-4"
-            >
-              {debtInfo.debtors} alumno{debtInfo.debtors > 1 ? 's' : ''} te debe{debtInfo.debtors > 1 ? 'n' : ''} {formatMoney(debtInfo.total, profile?.currency)} →
+        <>
+          <div className="label-muted mb-2">Para hoy</div>
+          <div className="card divide-y divide-bg-border mb-5 overflow-hidden">
+            <button onClick={() => setShowDebtModal(true)} className="w-full text-left px-4 py-3.5 flex items-center gap-3 hover:bg-white/5 transition">
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${debtInfo.debtors === 0 ? 'bg-brand/15 text-brand' : 'bg-amber-500/15 text-amber-400'}`}>
+                {debtInfo.debtors === 0 ? <CheckCircleIcon size={16} /> : <WarningIcon size={16} />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold">
+                  {debtInfo.debtors === 0 ? 'Estás al día con los cobros' : `${debtInfo.debtors} alumno${debtInfo.debtors > 1 ? 's' : ''} te debe${debtInfo.debtors > 1 ? 'n' : ''}`}
+                </div>
+                {debtInfo.debtors > 0 && <div className="text-xs text-slate-400">{formatMoney(debtInfo.total, profile?.currency)} en total</div>}
+              </div>
+              <ChevronRight size={16} className="text-slate-500 shrink-0" />
             </button>
-          )}
-          {unnotified === 0 ? (
-            <div className="rounded-xl bg-brand/10 border border-brand/30 text-brand text-sm font-semibold text-center py-3 px-4">
-              No tenés a quién avisar →
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowTomorrowModal(true)}
-              className="w-full rounded-xl bg-brand/10 border border-brand/30 text-brand text-sm font-semibold text-center py-3 px-4"
-            >
-              Avisar a {unnotified} alumno{unnotified > 1 ? 's' : ''} de mañana →
+
+            <button onClick={() => setShowTomorrowModal(true)} className="w-full text-left px-4 py-3.5 flex items-center gap-3 hover:bg-white/5 transition">
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${unnotified === 0 ? 'bg-brand/15 text-brand' : 'bg-brand-2/15 text-brand-2'}`}>
+                {unnotified === 0 ? <CheckCircleIcon size={16} /> : <BellIcon size={16} />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold">{unnotified === 0 ? 'No tenés a quién avisar de mañana' : 'Avisar de mañana'}</div>
+                {unnotified > 0 && <div className="text-xs text-slate-400">{unnotified} alumno{unnotified > 1 ? 's' : ''} sin confirmar</div>}
+              </div>
+              <ChevronRight size={16} className="text-slate-500 shrink-0" />
             </button>
-          )}
-        </div>
+
+            <button onClick={() => setShowWhoNotComing(true)} className="w-full text-left px-4 py-3.5 flex items-center gap-3 hover:bg-white/5 transition">
+              <div className="w-9 h-9 rounded-lg bg-white/5 text-slate-300 flex items-center justify-center shrink-0">
+                <UsersIcon size={16} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold">¿Quién no viene?</div>
+                <div className="text-xs text-slate-400">Marcá ausencias de hoy</div>
+              </div>
+              <ChevronRight size={16} className="text-slate-500 shrink-0" />
+            </button>
+          </div>
+        </>
       )}
 
       {showTomorrowModal && (
@@ -194,44 +213,13 @@ export default function Home() {
         />
       )}
 
-      <div className="label-muted mb-2">Secciones</div>
-      <div className="space-y-3">
-        <Link to="/panel" className="card block p-4 bg-gradient-to-br from-brand/15 via-brand-2/10 to-transparent border-brand/30">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-brand/20 flex items-center justify-center text-brand">
-              <CalendarIcon />
-            </div>
-            <div className="flex-1">
-              <div className="font-bold text-brand">Panel Profe</div>
-              <div className="text-xs text-slate-400">Tu semana: clases, alumnos y cobros</div>
-            </div>
-            <ChevronRight className="text-brand" />
-          </div>
-        </Link>
-
-        <div className="card p-4 flex items-center gap-3 opacity-80">
-          <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">▶</div>
-          <div className="flex-1">
-            <div className="font-bold">Cómo usar la app</div>
-            <div className="text-xs text-slate-400">En menos de 2 minutos</div>
-          </div>
+      <div className="label-muted mb-2">Más</div>
+      <div className="card p-4 flex items-center gap-3 opacity-50">
+        <div className="flex-1">
+          <div className="font-bold">Reservas y torneos</div>
+          <div className="text-xs text-slate-400">Gestioná tus canchas y armá torneos internos</div>
         </div>
-
-        <div className="card p-4 flex items-center gap-3 opacity-50">
-          <div className="flex-1">
-            <div className="font-bold">Reservas</div>
-            <div className="text-xs text-slate-400">Gestioná tus canchas</div>
-          </div>
-          <span className="text-[10px] font-bold uppercase bg-white/10 px-2 py-1 rounded-full">Próximamente</span>
-        </div>
-
-        <div className="card p-4 flex items-center gap-3 opacity-50">
-          <div className="flex-1">
-            <div className="font-bold">Torneos</div>
-            <div className="text-xs text-slate-400">Armá torneos internos</div>
-          </div>
-          <span className="text-[10px] font-bold uppercase bg-white/10 px-2 py-1 rounded-full">Próximamente</span>
-        </div>
+        <span className="text-[10px] font-bold uppercase bg-white/10 px-2 py-1 rounded-full shrink-0">Próximamente</span>
       </div>
     </div>
   )

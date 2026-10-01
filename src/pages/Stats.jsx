@@ -155,7 +155,7 @@ export default function Stats() {
   const breakdownTotal = BREAKDOWN_SIZES.reduce((s, size) => s + (current?.breakdown?.[size]?.count || 0), 0)
 
   return (
-    <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 fade-in">
+    <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 pb-24 fade-in">
       <Header backTo="/panel" backLabel="Panel" />
       <h1 className="text-xl font-extrabold mb-0.5">Estadísticas</h1>
       <p className="text-slate-400 text-sm mb-5">Cómo viene el mes, comparado con el que elijas</p>

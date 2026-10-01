@@ -132,7 +132,7 @@ export default function Caja() {
   }
 
   return (
-    <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 fade-in">
+    <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 pb-24 fade-in">
       <Header backTo="/panel" backLabel="Panel" />
 
       <div className="flex items-center justify-between mb-4">

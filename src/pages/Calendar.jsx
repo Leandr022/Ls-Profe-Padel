@@ -325,7 +325,7 @@ export default function Calendar() {
         : cursor.getFullYear() === today.getFullYear() && cursor.getMonth() === today.getMonth()
 
   return (
-    <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 fade-in">
+    <div className="max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-5 py-6 md:px-8 pb-24 fade-in">
       <Header backTo="/panel" backLabel="Panel" />
 
       <div className="grid grid-cols-3 card p-1 mb-4">
